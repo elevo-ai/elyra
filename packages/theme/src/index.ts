@@ -1,4 +1,13 @@
-/*
+/* 
+ * This program is an unpublished work fully protected by the United States
+ * copyright laws and is considered a trade secret belonging to Attala Systems Corporation.
+ * To the extent that this work may be considered "published", the following notice applies
+ * "(C) 2020, 2021, Attala Systems Corporation"
+ *
+ * Any unauthorized use, reproduction, distribution, display, modification,
+ * or disclosure of this program is strictly prohibited.
+ *
+ *
  * Copyright 2018-2022 Elyra Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -156,7 +165,7 @@ const extension: JupyterFrontEndPlugin<ILauncher> = {
       label: 'Documentation',
       icon: helpIcon,
       execute: (args: any) => {
-        window.open('https://elyra.readthedocs.io/en/latest/', '_blank');
+        window.open('https://github.com/elevo-ai/tutorial', '_blank');
       }
     });
 
@@ -174,7 +183,7 @@ const extension: JupyterFrontEndPlugin<ILauncher> = {
 
     model.add({
       command: CommandIDs.openHelp,
-      category: 'Elyra',
+      category: 'Integra',
       rank: 10
     });
 

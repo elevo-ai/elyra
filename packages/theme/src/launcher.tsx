@@ -1,4 +1,13 @@
-/*
+/* 
+ * This program is an unpublished work fully protected by the United States
+ * copyright laws and is considered a trade secret belonging to Attala Systems Corporation.
+ * To the extent that this work may be considered "published", the following notice applies
+ * "(C) 2020, 2021, Attala Systems Corporation"
+ *
+ * Any unauthorized use, reproduction, distribution, display, modification,
+ * or disclosure of this program is strictly prohibited.
+ *
+ *
  * Copyright 2018-2022 Elyra Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -31,7 +40,7 @@ import * as React from 'react';
 /**
  * The known categories of launcher items and their default ordering.
  */
-const ELYRA_CATEGORY = 'Elyra';
+const ELYRA_CATEGORY = 'Integra';
 
 const CommandIDs = {
   newFile: 'fileeditor:create-new',

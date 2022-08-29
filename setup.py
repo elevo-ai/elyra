@@ -1,3 +1,14 @@
+#!/usr/bin/env python3
+# ********************************************************************************************
+#
+# This program is an unpublished work fully protected by the United States
+# copyright laws and is considered a trade secret belonging to Attala Systems Corporation.
+# To the extent that this work may be considered "published", the following notice applies
+# "(C) 2020, 2021, Attala Systems Corporation"
+#
+# Any unauthorized use, reproduction, distribution, display, modification,
+# or disclosure of this program is strictly prohibited.
+#
 #
 # Copyright 2018-2022 Elyra Authors
 #
@@ -13,6 +24,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+# ********************************************************************************************
 import os
 
 from jupyter_packaging import get_data_files
@@ -132,6 +144,7 @@ setup_args = dict(
             "runtimes = elyra.metadata.schemaspaces:Runtimes",
             "runtimes-images = elyra.metadata.schemaspaces:RuntimeImages",
             "code-snippets = elyra.metadata.schemaspaces:CodeSnippets",
+            "templates = elyra.metadata.schemaspaces:Templates",
             "component-catalogs = elyra.metadata.schemaspaces:ComponentCatalogs",
             "metadata-tests = elyra.tests.metadata.test_utils:MetadataTestSchemaspace",
         ],
@@ -139,6 +152,7 @@ setup_args = dict(
             "runtimes = elyra.metadata.schemasproviders:RuntimesSchemas",
             "runtimes-images = elyra.metadata.schemasproviders:RuntimeImagesSchemas",
             "code-snippets = elyra.metadata.schemasproviders:CodeSnippetsSchemas",
+            "templates = elyra.metadata.schemasproviders:TemplatesSchemas",
             "component-catalogs = elyra.metadata.schemasproviders:ComponentCatalogsSchemas",
             "airflow-provider-package-catalog-schema = elyra.pipeline.airflow.provider_package_catalog_connector.airflow_provider_package_schema_provider:AirflowProviderPackageSchemasProvider",  # noqa: E501
             "airflow-package-catalog-schema = elyra.pipeline.airflow.package_catalog_connector.airflow_package_schema_provider:AirflowPackageSchemasProvider",  # noqa: E501

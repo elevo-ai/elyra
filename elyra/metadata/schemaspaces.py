@@ -1,3 +1,14 @@
+#!/usr/bin/env python3
+# ********************************************************************************************
+#
+# This program is an unpublished work fully protected by the United States
+# copyright laws and is considered a trade secret belonging to Attala Systems Corporation.
+# To the extent that this work may be considered "published", the following notice applies
+# "(C) 2020, 2021, Attala Systems Corporation"
+#
+# Any unauthorized use, reproduction, distribution, display, modification,
+# or disclosure of this program is strictly prohibited.
+#
 #
 # Copyright 2018-2022 Elyra Authors
 #
@@ -12,6 +23,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+#
+# ********************************************************************************************
 from elyra.metadata.schema import Schemaspace
 
 
@@ -54,6 +67,20 @@ class CodeSnippets(Schemaspace):
             name=CodeSnippets.CODE_SNIPPETS_SCHEMASPACE_NAME,
             display_name=CodeSnippets.CODE_SNIPPETS_SCHEMASPACE_DISPLAY_NAME,
             description="Schemaspace for instances of Elyra code snippets configurations",
+        )
+
+
+class Templates(Schemaspace):
+    TEMPLATES_SCHEMASPACE_ID = "9b55e002-1cc6-11ed-861d-0242ac120002"
+    TEMPLATES_SCHEMASPACE_NAME = "templates"
+    TEMPLATES_SCHEMASPACE_DISPLAY_NAME = "Templates"
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(
+            schemaspace_id=Templates.TEMPLATES_SCHEMASPACE_ID,
+            name=Templates.TEMPLATES_SCHEMASPACE_NAME,
+            display_name=Templates.TEMPLATES_SCHEMASPACE_DISPLAY_NAME,
+            description="Schemaspace for instances of Elyra templates configurations",
         )
 
 

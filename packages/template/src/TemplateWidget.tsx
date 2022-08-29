@@ -1,5 +1,4 @@
-/*
- * 
+/* 
  * This program is an unpublished work fully protected by the United States
  * copyright laws and is considered a trade secret belonging to Attala Systems Corporation.
  * To the extent that this work may be considered "published", the following notice applies
@@ -8,6 +7,20 @@
  * Any unauthorized use, reproduction, distribution, display, modification,
  * or disclosure of this program is strictly prohibited.
  *
+ *
+ * Copyright 2018-2022 Elyra Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 import '../style/index.css';
@@ -54,14 +67,14 @@ import { Widget } from '@lumino/widgets';
 import React from 'react';
 
 import {
-  CodeSnippetService,
-  CODE_SNIPPET_SCHEMASPACE,
-  CODE_SNIPPET_SCHEMA
-} from './CodeSnippetService';
+  TemplateService,
+  TEMPLATE_SCHEMASPACE,
+  TEMPLATE_SCHEMA
+} from './TemplateService';
 
 const METADATA_EDITOR_ID = 'elyra-metadata-editor';
-const SNIPPET_DRAG_IMAGE_CLASS = 'elyra-codeSnippet-drag-image';
-const CODE_SNIPPETS_METADATA_CLASS = 'elyra-metadata-code-snippets';
+const TEMP_DRAG_IMAGE_CLASS = 'elyra-template-drag-image';
+const TEMPLATES_METADATA_CLASS = 'elyra-metadata-templates';
 
 /**
  * The threshold in pixels to start a drag event.
@@ -74,9 +87,9 @@ const DRAG_THRESHOLD = 5;
 const JUPYTER_CELL_MIME = 'application/vnd.jupyter.cells';
 
 /**
- * CodeSnippetDisplay props.
+ * TemplateDisplay props.
  */
-interface ICodeSnippetDisplayProps extends IMetadataDisplayProps {
+interface ITemplateDisplayProps extends IMetadataDisplayProps {
   metadata: IMetadata[];
   openMetadataEditor: (args: any) => void;
   updateMetadata: () => void;
@@ -90,15 +103,15 @@ interface ICodeSnippetDisplayProps extends IMetadataDisplayProps {
 }
 
 /**
- * A React Component for code-snippets display list.
+ * A React Component for templates display list.
  */
-class CodeSnippetDisplay extends MetadataDisplay<
-  ICodeSnippetDisplayProps,
+class TemplateDisplay extends MetadataDisplay<
+  ITemplateDisplayProps,
   IMetadataDisplayState
 > {
-  editors: { [codeSnippetId: string]: CodeEditor.IEditor } = {};
+  editors: { [templateId: string]: CodeEditor.IEditor } = {};
 
-  constructor(props: ICodeSnippetDisplayProps) {
+  constructor(props: ITemplateDisplayProps) {
     super(props);
     this._drag = null;
     this._dragData = null;
@@ -106,11 +119,11 @@ class CodeSnippetDisplay extends MetadataDisplay<
     this._evtMouseUp = this._evtMouseUp.bind(this);
   }
 
-  // Handle code snippet insertion into an editor
-  private insertCodeSnippet = async (snippet: IMetadata): Promise<void> => {
+  // Handle template insertion into an editor
+  private insertTemplate = async (temp: IMetadata): Promise<void> => {
     const widget = this.props.getCurrentWidget();
-    const codeSnippet = snippet.metadata.code.join('\n');
-    const snippetLanguage = snippet.metadata.language;
+    const template = temp.metadata.code.join('\n');
+    const tempLanguage = temp.metadata.language;
 
     if (widget === null) {
       return;
@@ -123,15 +136,15 @@ class CodeSnippetDisplay extends MetadataDisplay<
 
       if (
         PathExt.extname(widget.context.path).match(markdownRegex) !== null &&
-        snippetLanguage.toLowerCase() !== 'markdown'
+        tempLanguage.toLowerCase() !== 'markdown'
       ) {
         fileEditor.replaceSelection?.(
-          this.addMarkdownCodeBlock(snippetLanguage, codeSnippet)
+          this.addMarkdownCodeBlock(tempLanguage, template)
         );
       } else if (editorLanguage) {
-        this.verifyLanguageAndInsert(snippet, editorLanguage, fileEditor);
+        this.verifyLanguageAndInsert(temp, editorLanguage, fileEditor);
       } else {
-        fileEditor.replaceSelection?.(codeSnippet);
+        fileEditor.replaceSelection?.(template);
       }
     } else if (widget instanceof NotebookPanel) {
       const notebookWidget = widget as NotebookPanel;
@@ -149,20 +162,16 @@ class CodeSnippetDisplay extends MetadataDisplay<
         const kernelInfo = await notebookWidget.sessionContext.session?.kernel
           ?.info;
         const kernelLanguage: string = kernelInfo?.language_info.name || '';
-        this.verifyLanguageAndInsert(
-          snippet,
-          kernelLanguage,
-          notebookCellEditor
-        );
+        this.verifyLanguageAndInsert(temp, kernelLanguage, notebookCellEditor);
       } else if (
         notebookCell instanceof MarkdownCell &&
-        snippetLanguage.toLowerCase() !== 'markdown'
+        tempLanguage.toLowerCase() !== 'markdown'
       ) {
         notebookCellEditor.replaceSelection?.(
-          this.addMarkdownCodeBlock(snippetLanguage, codeSnippet)
+          this.addMarkdownCodeBlock(tempLanguage, template)
         );
       } else {
-        notebookCellEditor.replaceSelection?.(codeSnippet);
+        notebookCellEditor.replaceSelection?.(template);
       }
       const cell = notebookWidget.model?.contentFactory.createCodeCell({});
       if (cell === undefined) {
@@ -170,7 +179,7 @@ class CodeSnippetDisplay extends MetadataDisplay<
       }
       notebookWidget.model?.cells.insert(notebookCellIndex + 1, cell);
     } else {
-      this.showErrDialog('Code snippet insert failed: Unsupported widget');
+      this.showErrDialog('Template insert failed: Unsupported widget');
     }
   };
 
@@ -195,44 +204,44 @@ class CodeSnippetDisplay extends MetadataDisplay<
     return '```' + language + '\n' + code + '\n```';
   };
 
-  // Handle language compatibility between code snippet and editor
+  // Handle language compatibility between template and editor
   private verifyLanguageAndInsert = async (
-    snippet: IMetadata,
+    temp: IMetadata,
     editorLanguage: string,
     editor: CodeEditor.IEditor
   ): Promise<void> => {
-    const codeSnippet: string = snippet.metadata.code.join('\n');
-    const snippetLanguage = snippet.metadata.language;
+    const template: string = temp.metadata.code.join('\n');
+    const tempLanguage = temp.metadata.language;
     if (
       editorLanguage &&
-      snippetLanguage.toLowerCase() !== editorLanguage.toLowerCase()
+      tempLanguage.toLowerCase() !== editorLanguage.toLowerCase()
     ) {
       const result = await this.showWarnDialog(
         editorLanguage,
-        snippet.display_name
+        temp.display_name
       );
       if (result.button.accept) {
-        editor.replaceSelection?.(codeSnippet);
+        editor.replaceSelection?.(template);
       }
     } else {
       // Language match or editorLanguage is unavailable
-      editor.replaceSelection?.(codeSnippet);
+      editor.replaceSelection?.(template);
     }
   };
 
-  // Display warning dialog when inserting a code snippet incompatible with editor's language
+  // Display warning dialog when inserting a template incompatible with editor's language
   private showWarnDialog = async (
     editorLanguage: string,
-    snippetName: string
+    tempName: string
   ): Promise<Dialog.IResult<string>> => {
     return showDialog({
       title: 'Warning',
-      body: `Code snippet "${snippetName}" is incompatible with ${editorLanguage}. Continue?`,
+      body: `Template "${tempName}" is incompatible with ${editorLanguage}. Continue?`,
       buttons: [Dialog.cancelButton(), Dialog.okButton()]
     });
   };
 
-  // Display error dialog when inserting a code snippet into unsupported widget (i.e. not an editor)
+  // Display error dialog when inserting a template into unsupported widget (i.e. not an editor)
   private showErrDialog = (errMsg: string): Promise<Dialog.IResult<string>> => {
     return showDialog({
       title: 'Error',
@@ -241,8 +250,8 @@ class CodeSnippetDisplay extends MetadataDisplay<
     });
   };
 
-  // Initial setup to handle dragging a code snippet
-  private handleDragSnippet(
+  // Initial setup to handle dragging a template
+  private handleDragTemp(
     event: React.MouseEvent<HTMLDivElement, MouseEvent>,
     metadata: IMetadata
   ): void {
@@ -312,7 +321,7 @@ class CodeSnippetDisplay extends MetadataDisplay<
       // Create drag image
       const element = document.createElement('div');
       element.innerHTML = this.getDisplayName(metadata);
-      element.classList.add(SNIPPET_DRAG_IMAGE_CLASS);
+      element.classList.add(TEMP_DRAG_IMAGE_CLASS);
       data.dragImage = element;
 
       // Remove mouse listeners and start the drag.
@@ -396,7 +405,7 @@ class CodeSnippetDisplay extends MetadataDisplay<
         title: 'Insert',
         icon: importIcon,
         onClick: (): void => {
-          this.insertCodeSnippet(metadata);
+          this.insertTemplate(metadata);
         }
       },
       {
@@ -405,8 +414,8 @@ class CodeSnippetDisplay extends MetadataDisplay<
         onClick: (): void => {
           this.props.openMetadataEditor({
             onSave: this.props.updateMetadata,
-            schemaspace: CODE_SNIPPET_SCHEMASPACE,
-            schema: CODE_SNIPPET_SCHEMA,
+            schemaspace: TEMPLATE_SCHEMASPACE,
+            schema: TEMPLATE_SCHEMA,
             name: metadata.name
           });
         }
@@ -416,7 +425,7 @@ class CodeSnippetDisplay extends MetadataDisplay<
         icon: copyIcon,
         onClick: (): void => {
           MetadataCommonService.duplicateMetadataInstance(
-            CODE_SNIPPET_SCHEMASPACE,
+            TEMPLATE_SCHEMASPACE,
             metadata,
             this.props.metadata
           )
@@ -430,7 +439,7 @@ class CodeSnippetDisplay extends MetadataDisplay<
         title: 'Delete',
         icon: trashIcon,
         onClick: (): void => {
-          CodeSnippetService.deleteCodeSnippet(metadata)
+          TemplateService.deleteTemplate(metadata)
             .then((deleted: any): void => {
               if (deleted) {
                 this.props.updateMetadata();
@@ -440,7 +449,7 @@ class CodeSnippetDisplay extends MetadataDisplay<
                   (value: Widget, index: number) => {
                     return (
                       value.id ===
-                      `${METADATA_EDITOR_ID}:${CODE_SNIPPET_SCHEMASPACE}:${CODE_SNIPPET_SCHEMA}:${metadata.name}`
+                      `${METADATA_EDITOR_ID}:${TEMPLATE_SCHEMASPACE}:${TEMPLATE_SCHEMA}:${metadata.name}`
                     );
                   }
                 );
@@ -467,7 +476,7 @@ class CodeSnippetDisplay extends MetadataDisplay<
 
   matchesSearch(searchValue: string, metadata: IMetadata): boolean {
     searchValue = searchValue.toLowerCase();
-    // True if search string is in name, display_name, or language of snippet
+    // True if search string is in name, display_name, or language of temp
     // or if the search string is empty
     return (
       metadata.name.toLowerCase().includes(searchValue) ||
@@ -476,7 +485,7 @@ class CodeSnippetDisplay extends MetadataDisplay<
     );
   }
 
-  // Render display of a code snippet
+  // Render display of a template
   renderMetadata = (metadata: IMetadata): JSX.Element => {
     return (
       <div
@@ -495,7 +504,7 @@ class CodeSnippetDisplay extends MetadataDisplay<
             this.editors[metadata.name].refresh();
           }}
           onMouseDown={(event: any): void => {
-            this.handleDragSnippet(event, metadata);
+            this.handleDragTemp(event, metadata);
           }}
         >
           <div id={metadata.name}></div>
@@ -509,26 +518,26 @@ class CodeSnippetDisplay extends MetadataDisplay<
       .newInlineEditor;
     const getMimeTypeByLanguage = this.props.editorServices.mimeTypeService
       .getMimeTypeByLanguage;
-    this.props.metadata.map((codeSnippet: IMetadata) => {
-      if (codeSnippet.name in this.editors) {
+    this.props.metadata.map((template: IMetadata) => {
+      if (template.name in this.editors) {
         // Make sure code is up to date
         this.editors[
-          codeSnippet.name
-        ].model.value.text = codeSnippet.metadata.code.join('\n');
+          template.name
+        ].model.value.text = template.metadata.code.join('\n');
       } else {
-        // Add new snippets
-        const snippetElement = document.getElementById(codeSnippet.name);
-        if (snippetElement === null) {
+        // Add new temps
+        const tempElement = document.getElementById(template.name);
+        if (tempElement === null) {
           return;
         }
-        this.editors[codeSnippet.name] = editorFactory({
+        this.editors[template.name] = editorFactory({
           config: { readOnly: true },
-          host: snippetElement,
+          host: tempElement,
           model: new CodeEditor.Model({
-            value: codeSnippet.metadata.code.join('\n'),
+            value: template.metadata.code.join('\n'),
             mimeType: getMimeTypeByLanguage({
-              name: codeSnippet.metadata.language,
-              codemirror_mode: codeSnippet.metadata.language
+              name: template.metadata.language,
+              codemirror_mode: template.metadata.language
             })
           })
         });
@@ -553,9 +562,9 @@ class CodeSnippetDisplay extends MetadataDisplay<
 }
 
 /**
- * CodeSnippetWidget props.
+ * TemplateWidget props.
  */
-export interface ICodeSnippetWidgetProps extends IMetadataWidgetProps {
+export interface ITemplateWidgetProps extends IMetadataWidgetProps {
   app: JupyterFrontEnd;
   display_name: string;
   schemaspace: string;
@@ -566,16 +575,16 @@ export interface ICodeSnippetWidgetProps extends IMetadataWidgetProps {
 }
 
 /**
- * A widget for Code Snippets.
+ * A widget for Templates.
  */
-export class CodeSnippetWidget extends MetadataWidget {
-  constructor(public props: ICodeSnippetWidgetProps) {
+export class TemplateWidget extends MetadataWidget {
+  constructor(public props: ITemplateWidgetProps) {
     super(props);
   }
 
-  // Request code snippets from server
+  // Request templates from server
   async fetchMetadata(): Promise<any> {
-    return CodeSnippetService.findAll().catch(error =>
+    return TemplateService.findAll().catch(error =>
       RequestErrors.serverError(error)
     );
   }
@@ -594,14 +603,14 @@ export class CodeSnippetWidget extends MetadataWidget {
     }
 
     return (
-      <CodeSnippetDisplay
+      <TemplateDisplay
         metadata={metadata}
         openMetadataEditor={this.openMetadataEditor}
         updateMetadata={this.updateMetadata}
-        schemaspace={CODE_SNIPPET_SCHEMASPACE}
-        schema={CODE_SNIPPET_SCHEMA}
+        schemaspace={TEMPLATE_SCHEMASPACE}
+        schema={TEMPLATE_SCHEMA}
         getCurrentWidget={this.props.getCurrentWidget}
-        className={CODE_SNIPPETS_METADATA_CLASS}
+        className={TEMPLATES_METADATA_CLASS}
         editorServices={this.props.editorServices}
         shell={this.props.app.shell}
         sortMetadata={true}

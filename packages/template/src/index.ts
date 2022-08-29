@@ -1,5 +1,4 @@
-/*
- * 
+/* 
  * This program is an unpublished work fully protected by the United States
  * copyright laws and is considered a trade secret belonging to Attala Systems Corporation.
  * To the extent that this work may be considered "published", the following notice applies
@@ -8,11 +7,25 @@
  * Any unauthorized use, reproduction, distribution, display, modification,
  * or disclosure of this program is strictly prohibited.
  *
+ *
+ * Copyright 2018-2022 Elyra Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 import '../style/index.css';
 
-import { codeSnippetIcon } from '@elyra/ui-components';
+import { templateIcon } from '@elyra/ui-components';
 
 import {
   JupyterFrontEnd,
@@ -28,23 +41,20 @@ import { MarkdownDocument } from '@jupyterlab/markdownviewer';
 import { Notebook, NotebookPanel } from '@jupyterlab/notebook';
 import { Widget } from '@lumino/widgets';
 
-import {
-  CODE_SNIPPET_SCHEMASPACE,
-  CODE_SNIPPET_SCHEMA
-} from './CodeSnippetService';
-import { CodeSnippetWidget } from './CodeSnippetWidget';
+import { TEMPLATE_SCHEMASPACE, TEMPLATE_SCHEMA } from './TemplateService';
+import { TemplateWidget } from './TemplateWidget';
 
-const CODE_SNIPPET_EXTENSION_ID = 'elyra-code-snippet-extension';
+const TEMPLATE_EXTENSION_ID = 'elyra-template-extension';
 
 const commandIDs = {
-  saveAsSnippet: 'codesnippet:save-as-snippet'
+  saveAsTemp: 'template:save-as-temp'
 };
 
 /**
- * Initialization data for the code-snippet extension.
+ * Initialization data for the template extension.
  */
-export const code_snippet_extension: JupyterFrontEndPlugin<void> = {
-  id: CODE_SNIPPET_EXTENSION_ID,
+export const template_extension: JupyterFrontEndPlugin<void> = {
+  id: TEMPLATE_EXTENSION_ID,
   autoStart: true,
   requires: [ICommandPalette, ILayoutRestorer, IEditorServices],
   optional: [IThemeManager],
@@ -55,36 +65,36 @@ export const code_snippet_extension: JupyterFrontEndPlugin<void> = {
     editorServices: IEditorServices,
     themeManager?: IThemeManager
   ) => {
-    console.log('Elyra - code-snippet extension is activated!');
+    console.log('Elyra - template extension is activated!');
 
     const getCurrentWidget = (): Widget | null => {
       return app.shell.currentWidget;
     };
 
-    const codeSnippetWidget = new CodeSnippetWidget({
+    const templateWidget = new TemplateWidget({
       app,
       themeManager,
-      display_name: 'Code Snippets',
-      schemaspace: CODE_SNIPPET_SCHEMASPACE,
-      schema: CODE_SNIPPET_SCHEMA,
-      icon: codeSnippetIcon,
+      display_name: 'Templates',
+      schemaspace: TEMPLATE_SCHEMASPACE,
+      schema: TEMPLATE_SCHEMA,
+      icon: templateIcon,
       getCurrentWidget,
       editorServices,
-      titleContext: 'code snippet'
+      titleContext: 'template'
     });
-    const codeSnippetWidgetId = `elyra-metadata:${CODE_SNIPPET_SCHEMASPACE}`;
-    codeSnippetWidget.id = codeSnippetWidgetId;
-    codeSnippetWidget.title.icon = codeSnippetIcon;
-    codeSnippetWidget.title.caption = 'Code Snippets';
+    const templateWidgetId = `elyra-metadata:${TEMPLATE_SCHEMASPACE}`;
+    templateWidget.id = templateWidgetId;
+    templateWidget.title.icon = templateIcon;
+    templateWidget.title.caption = 'Templates';
 
-    restorer.add(codeSnippetWidget, codeSnippetWidgetId);
+    restorer.add(templateWidget, templateWidgetId);
 
     // Rank has been chosen somewhat arbitrarily to give priority to the running
     // sessions widget in the sidebar.
-    app.shell.add(codeSnippetWidget, 'left', { rank: 900 });
+    app.shell.add(templateWidget, 'left', { rank: 900 });
 
-    app.commands.addCommand(commandIDs.saveAsSnippet, {
-      label: 'Save As Code Snippet',
+    app.commands.addCommand(commandIDs.saveAsTemp, {
+      label: 'Save As Template',
       isEnabled: () => {
         const currentWidget = app.shell.currentWidget;
         const editor = getEditor(currentWidget);
@@ -121,38 +131,38 @@ export const code_snippet_extension: JupyterFrontEndPlugin<void> = {
         }
 
         if (selection.length > 0) {
-          codeSnippetWidget.openMetadataEditor({
-            schemaspace: CODE_SNIPPET_SCHEMASPACE,
-            schema: CODE_SNIPPET_SCHEMA,
+          templateWidget.openMetadataEditor({
+            schemaspace: TEMPLATE_SCHEMASPACE,
+            schema: TEMPLATE_SCHEMA,
             code: selection.split('\n'),
-            onSave: codeSnippetWidget.updateMetadata
+            onSave: templateWidget.updateMetadata
           });
         } else {
           const selectedCells = getSelectedCellContents();
           const code = selectedCells.join('\n\n').split('\n');
 
-          codeSnippetWidget.openMetadataEditor({
-            schemaspace: CODE_SNIPPET_SCHEMASPACE,
-            schema: CODE_SNIPPET_SCHEMA,
+          templateWidget.openMetadataEditor({
+            schemaspace: TEMPLATE_SCHEMASPACE,
+            schema: TEMPLATE_SCHEMA,
             code: code,
-            onSave: codeSnippetWidget.updateMetadata
+            onSave: templateWidget.updateMetadata
           });
         }
       }
     });
 
     app.contextMenu.addItem({
-      command: commandIDs.saveAsSnippet,
+      command: commandIDs.saveAsTemp,
       selector: '.jp-Cell'
     });
 
     app.contextMenu.addItem({
-      command: commandIDs.saveAsSnippet,
+      command: commandIDs.saveAsTemp,
       selector: '.jp-FileEditor'
     });
 
     app.contextMenu.addItem({
-      command: commandIDs.saveAsSnippet,
+      command: commandIDs.saveAsTemp,
       selector: '.jp-MarkdownViewer'
     });
 
@@ -223,4 +233,4 @@ export const code_snippet_extension: JupyterFrontEndPlugin<void> = {
   }
 };
 
-export default code_snippet_extension;
+export default template_extension;

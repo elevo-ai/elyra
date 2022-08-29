@@ -1,4 +1,13 @@
-/*
+/* 
+ * This program is an unpublished work fully protected by the United States
+ * copyright laws and is considered a trade secret belonging to Attala Systems Corporation.
+ * To the extent that this work may be considered "published", the following notice applies
+ * "(C) 2020, 2021, Attala Systems Corporation"
+ *
+ * Any unauthorized use, reproduction, distribution, display, modification,
+ * or disclosure of this program is strictly prohibited.
+ *
+ *
  * Copyright 2018-2022 Elyra Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -33,6 +42,7 @@ import runtimesSvg from '../style/icons/runtimes.svg';
 import savePipelineSvg from '../style/icons/save-pipeline.svg';
 import scalaIconSvg from '../style/icons/scala-logo.svg';
 import tagIconSvg from '../style/icons/tag.svg';
+import templateSvg from '../style/icons/template.svg';
 import trashIconSvg from '../style/icons/trashIcon.svg';
 import viewOffIconSvg from '../style/icons/view--off.svg';
 import viewIconSvg from '../style/icons/view.svg';
@@ -45,6 +55,10 @@ export const importIcon = new LabIcon({
 export const codeSnippetIcon = new LabIcon({
   name: 'elyra:code-snippet',
   svgstr: codeSnippetSvg
+});
+export const templateIcon = new LabIcon({
+  name: 'elyra:template',
+  svgstr: templateSvg
 });
 export const dragDropIcon = new LabIcon({
   name: 'elyra:dragdrop',
