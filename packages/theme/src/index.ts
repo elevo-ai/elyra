@@ -1,13 +1,4 @@
-/* 
- * This program is an unpublished work fully protected by the United States
- * copyright laws and is considered a trade secret belonging to Attala Systems Corporation.
- * To the extent that this work may be considered "published", the following notice applies
- * "(C) 2020, 2021, Attala Systems Corporation"
- *
- * Any unauthorized use, reproduction, distribution, display, modification,
- * or disclosure of this program is strictly prohibited.
- *
- *
+/*
  * Copyright 2018-2022 Elyra Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -58,7 +49,7 @@ const CommandIDs = {
 const extension: JupyterFrontEndPlugin<ILauncher> = {
   id: ELYRA_THEME_NAMESPACE,
   autoStart: true,
-  requires: [ITranslator, ILabShell, IMainMenu],
+  requires: [ITranslator, ILabShell, IMainMenu, JupyterFrontEnd.IPaths],
   optional: [ICommandPalette],
   provides: ILauncher,
   activate: (
@@ -66,6 +57,7 @@ const extension: JupyterFrontEndPlugin<ILauncher> = {
     translator: ITranslator,
     labShell: ILabShell,
     mainMenu: IMainMenu,
+    paths: JupyterFrontEnd.IPaths,
     palette: ICommandPalette | null
   ): ILauncher => {
     console.log('Elyra - theme extension is activated!');
@@ -165,7 +157,18 @@ const extension: JupyterFrontEndPlugin<ILauncher> = {
       label: 'Documentation',
       icon: helpIcon,
       execute: (args: any) => {
-        window.open('https://github.com/elevo-ai/tutorial', '_blank');
+        const hubPrefix = paths.urls.hubPrefix;
+        if (hubPrefix !== null && hubPrefix !== undefined) {
+          window.location.href =
+            window.location.origin +
+            hubPrefix.replace('/hub/', '/') +
+            'user-redirect/proxy/integra-docs:80/';
+        } else {
+          window.location.href =
+            window.location.origin +
+            paths.urls.base +
+            'user-redirect/proxy/integra-docs:80/';
+        }
       }
     });
 
