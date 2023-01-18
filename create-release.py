@@ -465,10 +465,11 @@ def build_release():
     # Build wheels and source packages
     check_run(["make", "release"], cwd=config.source_dir, capture_output=False)
 
-    # Build container images from tagged release
-    check_run(["git", "checkout", f"tags/v{config.new_version}"], cwd=config.source_dir, capture_output=False)
-    check_run(["make", "container-images"], cwd=config.source_dir, capture_output=False)
-    check_run(["git", "checkout", "main"], cwd=config.source_dir, capture_output=False)
+    if not config.pre_release:
+        # Build container images from tagged release
+        check_run(["git", "checkout", f"tags/v{config.new_version}"], cwd=config.source_dir, capture_output=False)
+        check_run(["make", "container-images"], cwd=config.source_dir, capture_output=False)
+        check_run(["git", "checkout", "main"], cwd=config.source_dir, capture_output=False)
 
     print("")
 
@@ -481,9 +482,9 @@ def build_server():
     print("-----------------------------------------------------------------")
 
     # update project name
-    sed(_source("setup.py"), r'name="elyra"', 'name="elyra-server"')
+    sed(_source("pyproject.toml"), r'name="elyra"', 'name="elyra-server"')
     sed(
-        _source("setup.py"),
+        _source("pyproject.toml"),
         r'description="Elyra provides AI Centric extensions to JupyterLab"',
         'description="The elyra-server package provides common core libraries and functions that are required by '
         "Elyra's individual extensions. Note: Installing this package alone will not enable the use of Elyra. "
@@ -517,8 +518,8 @@ def show_release_artifacts():
 def copy_extension_dir(extension: str, work_dir: str) -> None:
     global config
 
-    extension_package_source_dir = os.path.join(config.source_dir, "dist/labextensions/@elyra", extension)
-    extension_package_dest_dir = os.path.join(work_dir, "dist/labextensions/@elyra", extension)
+    extension_package_source_dir = os.path.join(config.source_dir, "build/labextensions/@elyra", extension)
+    extension_package_dest_dir = os.path.join(work_dir, "build/labextensions/@elyra", extension)
     os.makedirs(os.path.dirname(extension_package_dest_dir), exist_ok=True)
     shutil.copytree(extension_package_source_dir, extension_package_dest_dir)
 
@@ -627,21 +628,21 @@ def prepare_extensions_release() -> None:
             f"See https://elyra.readthedocs.io/en/v{config.new_version}/user_guide/pipelines.html",
         ),
         "elyra-python-editor-extension": SimpleNamespace(
-            packages=["python-editor-extension", "metadata-extension", "theme-extension"],
+            packages=["python-editor-extension", "metadata-extension", "theme-extension", "script-debugger-extension"],
             description=f"The Python Script editor extension contains support for Python files, "
             f"which can take advantage of the Hybrid Runtime Support enabling users to "
-            f"locally edit .py scripts and execute them against local or cloud-based resources."
+            f"locally edit, execute and debug .py scripts against local or cloud-based resources."
             f"See https://elyra.readthedocs.io/en/v{config.new_version}/user_guide/enhanced-script-support.html",
         ),
         "elyra-r-editor-extension": SimpleNamespace(
-            packages=["r-editor-extension", "metadata-extension", "theme-extension"],
+            packages=["r-editor-extension", "metadata-extension", "theme-extension", "script-debugger-extension"],
             description=f"The R Script editor extension contains support for R files, which can take "
             f"advantage of the Hybrid Runtime Support enabling users to locally edit .R scripts "
             f"and execute them against local or cloud-based resources."
             f"See https://elyra.readthedocs.io/en/v{config.new_version}/user_guide/enhanced-script-support.html",
         ),
         "elyra-scala-editor-extension": SimpleNamespace(
-            packages=["scala-editor-extension", "metadata-extension", "theme-extension"],
+            packages=["scala-editor-extension", "metadata-extension", "theme-extension", "script-debugger-extension"],
             description=f"The Scala Language editor extension contains support for Scala files, which can take "
             f"advantage of the Hybrid Runtime Support enabling users to locally edit .scala files "
             f"and execute them against local or cloud-based resources."
@@ -663,7 +664,7 @@ def prepare_extensions_release() -> None:
         setup_file = os.path.join(extension_source_dir, "setup.py")
         sed(setup_file, "{{package-name}}", extension)
         sed(setup_file, "{{version}}", config.new_version)
-        sed(setup_file, "{{data - files}}", re.escape("('share/jupyter/labextensions', 'dist/labextensions', '**')"))
+        sed(setup_file, "{{data - files}}", re.escape("('share/jupyter/labextensions', 'build/labextensions', '**')"))
         sed(setup_file, "{{install - requires}}", f"'elyra-server=={config.new_version}',")
         sed(setup_file, "{{description}}", f"'{extensions[extension].description}'")
 
@@ -777,7 +778,7 @@ def publish_release(working_dir) -> None:
         f"{config.source_dir}/dist/elyra-{config.new_version}-py3-none-any.whl",
         f"{config.source_dir}/dist/elyra-{config.new_version}.tar.gz",
         f"{config.source_dir}/dist/elyra_server-{config.new_version}-py3-none-any.whl",
-        f"{config.source_dir}/dist/elyra-server-{config.new_version}.tar.gz",
+        f"{config.source_dir}/dist/elyra_server-{config.new_version}.tar.gz",
         f"{config.work_dir}/airflow-notebook/dist/airflow_notebook-{config.new_version}-py3-none-any.whl",
         f"{config.work_dir}/airflow-notebook/dist/airflow-notebook-{config.new_version}.tar.gz",
         f"{config.work_dir}/kfp-notebook/dist/kfp_notebook-{config.new_version}-py3-none-any.whl",
@@ -848,11 +849,12 @@ def publish_release(working_dir) -> None:
     print("-----------------------------------------------------------------")
     # push container images
     print()
-    print(f"Pushing container images")
-    is_latest = config.git_branch == "main" and not config.pre_release
-    check_run(["git", "checkout", f"tags/v{config.new_version}"], cwd=config.source_dir, capture_output=False)
-    check_run(["make", "publish-container-images", f"IMAGE_IS_LATEST={is_latest}"], cwd=config.source_dir)
-    check_run(["git", "checkout", "main"], cwd=config.source_dir, capture_output=False)
+    if not config.pre_release:
+        print(f"Pushing container images")
+        is_latest = config.git_branch == "main"
+        check_run(["git", "checkout", f"tags/v{config.new_version}"], cwd=config.source_dir, capture_output=False)
+        check_run(["make", "publish-container-images", f"IMAGE_IS_LATEST={is_latest}"], cwd=config.source_dir)
+        check_run(["git", "checkout", "main"], cwd=config.source_dir, capture_output=False)
 
 
 def initialize_config(args=None) -> SimpleNamespace:

@@ -1,6 +1,6 @@
 {
   "name": "@elyra/code-viewer-extension",
-  "version": "3.11.0-dev",
+  "version": "3.15.0-dev",
   "description": "JupyterLab extension - Display code without a file",
   "keywords": [
     "jupyter",
@@ -30,8 +30,8 @@
     "build:lib": "tsc",
     "build:labextension": "jupyter labextension build .",
     "build:labextension:dev": "jupyter labextension build --development True .",
-    "clean": "rimraf lib tsconfig.tsbuildinfo ../../dist/labextensions/@elyra/code-viewer-extension",
-    "lab:dev": "jupyter labextension develop --overwrite ../../dist/labextensions/@elyra/code-viewer-extension",
+    "clean": "rimraf lib tsconfig.tsbuildinfo ../../build/labextensions/@elyra/code-viewer-extension",
+    "lab:dev": "jupyter labextension develop --overwrite ../../build/labextensions/@elyra/code-viewer-extension",
     "dist": "npm pack .",
     "prepare": "npm run build",
     "watch": "run-p watch:src watch:labextension",
@@ -43,11 +43,11 @@
     "unlink:dev": "yarn unlink @jupyterlab/builder"
   },
   "dependencies": {
-    "@jupyterlab/application": "^3.4.0",
-    "@jupyterlab/apputils": "^3.4.0",
-    "@jupyterlab/builder": "^3.4.0",
-    "@jupyterlab/codeeditor": "^3.4.0",
-    "@jupyterlab/ui-components": "^3.4.0",
+    "@jupyterlab/application": "^3.4.6",
+    "@jupyterlab/apputils": "^3.4.6",
+    "@jupyterlab/builder": "^3.4.6",
+    "@jupyterlab/codeeditor": "^3.4.6",
+    "@jupyterlab/ui-components": "^3.4.6",
     "@lumino/algorithm": "^1.9.1",
     "@lumino/widgets": "^1.31.1"
   },
@@ -60,6 +60,6 @@
   },
   "jupyterlab": {
     "extension": true,
-    "outputDir": "../../dist/labextensions/@elyra/code-viewer-extension"
+    "outputDir": "../../build/labextensions/@elyra/code-viewer-extension"
   }
 }

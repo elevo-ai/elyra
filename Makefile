@@ -86,6 +86,7 @@ uninstall-src: # Uninstalls source extensions if they're still installed
 	- jupyter labextension uninstall --no-build @elyra/r-editor-extension
 	- jupyter labextension uninstall --no-build @elyra/scala-editor-extension
 	- jupyter labextension uninstall --no-build @elyra/code-viewer-extension
+	- jupyter labextension uninstall --no-build @elyra/script-debugger-extension
 	- jupyter labextension unlink --no-build @elyra/pipeline-services
 	- jupyter labextension unlink --no-build @elyra/pipeline-editor
 
@@ -170,7 +171,7 @@ package-ui: build-dependencies yarn-install lint-ui build-ui
 package-ui-dev: dev-dependencies yarn-install dev-link lint-ui build-ui
 
 build-server: # Build backend
-	$(PYTHON) -m setup bdist_wheel sdist
+	$(PYTHON) -m build
 
 uninstall-server-package:
 	@$(PYTHON_PIP) uninstall elyra -y
@@ -196,6 +197,7 @@ install-gitlab-dependency:
 	- $(PYTHON_PIP) install --upgrade python-gitlab
 
 check-install:
+	# Expected to fail due to elyra/ai#3058
 	jupyter server extension list
 	jupyter labextension list
 
@@ -207,7 +209,7 @@ release: yarn-install build-ui build-server ## Build wheel file for release
 
 elyra-image-env: ## Creates a conda env consisting of the dependencies used in images
 	conda env remove -y -n $(ELYRA_IMAGE_ENV)
-	conda create -y -n $(ELYRA_IMAGE_ENV) python=$(PYTHON_VERSION)
+	conda create -y -n $(ELYRA_IMAGE_ENV) python=$(PYTHON_VERSION) --channel conda-forge
 	if [ "$(PYTHON_VERSION)" == "3.7" ]; then \
 		$(CONDA_ACTIVATE) $(ELYRA_IMAGE_ENV) && \
 		$(PYTHON_PIP) install -r etc/generic/requirements-elyra-py37.txt && \

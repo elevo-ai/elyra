@@ -1,6 +1,6 @@
 {
   "name": "@elyra/r-editor-extension",
-  "version": "3.11.0-dev",
+  "version": "3.15.0-dev",
   "description": "JupyterLab extension - Run R scripts using a kernel runtime",
   "keywords": [
     "jupyter",
@@ -30,8 +30,8 @@
     "build:lib": "tsc",
     "build:labextension": "jupyter labextension build .",
     "build:labextension:dev": "jupyter labextension build --development True .",
-    "clean": "rimraf lib tsconfig.tsbuildinfo ../../dist/labextensions/@elyra/r-editor-extension",
-    "lab:dev": "jupyter labextension develop --overwrite ../../dist/labextensions/@elyra/r-editor-extension",
+    "clean": "rimraf lib tsconfig.tsbuildinfo ../../build/labextensions/@elyra/r-editor-extension",
+    "lab:dev": "jupyter labextension develop --overwrite ../../build/labextensions/@elyra/r-editor-extension",
     "dist": "npm pack .",
     "prepare": "npm run build",
     "watch": "run-p watch:src watch:labextension",
@@ -43,18 +43,18 @@
     "unlink:dev": "yarn unlink @jupyterlab/builder"
   },
   "dependencies": {
-    "@elyra/script-editor": "3.11.0-dev",
-    "@elyra/ui-components": "3.11.0-dev",
-    "@jupyterlab/application": "^3.4.0",
-    "@jupyterlab/apputils": "^3.4.0",
-    "@jupyterlab/builder": "^3.4.0",
-    "@jupyterlab/codeeditor": "^3.4.0",
-    "@jupyterlab/docregistry": "^3.4.0",
-    "@jupyterlab/filebrowser": "^3.4.0",
-    "@jupyterlab/fileeditor": "^3.4.0",
-    "@jupyterlab/launcher": "^3.4.0",
-    "@jupyterlab/mainmenu": "^3.4.0",
-    "@jupyterlab/settingregistry": "^3.4.0",
+    "@elyra/script-editor": "3.15.0-dev",
+    "@elyra/ui-components": "3.15.0-dev",
+    "@jupyterlab/application": "^3.4.6",
+    "@jupyterlab/apputils": "^3.4.6",
+    "@jupyterlab/builder": "^3.4.6",
+    "@jupyterlab/codeeditor": "^3.4.6",
+    "@jupyterlab/docregistry": "^3.4.6",
+    "@jupyterlab/filebrowser": "^3.4.6",
+    "@jupyterlab/fileeditor": "^3.4.6",
+    "@jupyterlab/launcher": "^3.4.6",
+    "@jupyterlab/mainmenu": "^3.4.6",
+    "@jupyterlab/settingregistry": "^3.4.6",
     "@lumino/coreutils": "^1.5.6"
   },
   "devDependencies": {
@@ -66,6 +66,6 @@
   },
   "jupyterlab": {
     "extension": true,
-    "outputDir": "../../dist/labextensions/@elyra/r-editor-extension"
+    "outputDir": "../../build/labextensions/@elyra/r-editor-extension"
   }
 }

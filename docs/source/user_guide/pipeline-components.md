@@ -138,6 +138,16 @@ To add components from a catalog:
 
  > Tip: check the log file for error messages if no components from the added catalog are displayed in the palette.
 
+#### Reloading a component catalog entry
+
+To reload a catalog entry if the underlying catalog has changed: 
+
+1. Open the `Pipeline Components` panel.
+1. Click the `reload` icon next to the entry name.
+1. The catalog entry is re-loaded and changes are reflected in the Visual Pipeline Editor palette. How quickly the entry is processed depends on the catalog type, the number of entries in the catalog, and network connectivity.
+
+> Tip: check the log file for error messages if no updates from the reloaded catalog are displayed in the palette. 
+
 #### Modifying a component catalog entry
 
 1. Open the `Pipeline Components` panel.
@@ -397,6 +407,7 @@ The URL component catalog connector provides access to components that are store
 - You can specify one or more URL resources.
 - The specified URLs must be retrievable using an HTTP `GET` request. `http`, `https`, and `file` [URI schemes](https://www.iana.org/assignments/uri-schemes/uri-schemes.xhtml) are supported.
 - If the resources are secured, provide credentials, such as a user id and password or API key.
+- In secured environments where SSL server authenticity can only be validated using certificates based on private public key infrastructure (PKI) with root and optionally intermediate certificate authorities (CAs) that are not publicly trusted, you must define environment variable `TRUSTED_CA_BUNDLE_PATH` in the environment where JupyterLab/Elyra is running. The variable value must identify an existing [Privacy-Enhanced Mail (PEM) file](https://en.wikipedia.org/wiki/Privacy-Enhanced_Mail).
 
 Examples (GUI):
  - HTTPS URL
@@ -428,6 +439,7 @@ Examples (CLI):
 The [Apache Airflow package catalog connector](https://github.com/elyra-ai/elyra/tree/main/elyra/pipeline/airflow/package_catalog_connector) provides access to operators that are stored in Apache Airflow [built distributions](https://packaging.python.org/en/latest/glossary/#term-built-distribution):
 - Only the [wheel distribution format](https://packaging.python.org/en/latest/glossary/#term-Wheel) is supported.
 - The specified URL must be retrievable using an HTTP `GET` request. `http`, `https`, and `file` [URI schemes](https://www.iana.org/assignments/uri-schemes/uri-schemes.xhtml) are supported.
+- In secured environments where SSL server authenticity can only be validated using certificates based on private public key infrastructure (PKI) with root and optionally intermediate certificate authorities (CAs) that are not publicly trusted, you must define environment variable `TRUSTED_CA_BUNDLE_PATH` in the environment where JupyterLab/Elyra is running. The variable value must identify an existing [Privacy-Enhanced Mail (PEM) file](https://en.wikipedia.org/wiki/Privacy-Enhanced_Mail).
 
 Examples:
  - [Apache Airflow](https://pypi.org/project/apache-airflow/) (v1.10.15): 
@@ -443,6 +455,7 @@ Examples:
 The [Apache Airflow provider package catalog connector](https://github.com/elyra-ai/elyra/tree/main/elyra/pipeline/airflow/provider_package_catalog_connector) provides access to operators that are stored in [Apache Airflow provider packages](https://airflow.apache.org/docs/apache-airflow-providers/):
 - Only the [wheel distribution format](https://packaging.python.org/en/latest/glossary/#term-Wheel) is supported.
 - The specified URL must be retrievable using an HTTP `GET` request. `http`, `https`, and `file` [URI schemes](https://www.iana.org/assignments/uri-schemes/uri-schemes.xhtml) are supported.
+- In secured environments where SSL server authenticity can only be validated using certificates based on private public key infrastructure (PKI) with root and optionally intermediate certificate authorities (CAs) that are not publicly trusted, you must define environment variable `TRUSTED_CA_BUNDLE_PATH` in the environment where JupyterLab/Elyra is running. The variable value must identify an existing [Privacy-Enhanced Mail (PEM) file](https://en.wikipedia.org/wiki/Privacy-Enhanced_Mail).
 
 Examples:
  - [apache-airflow-providers-http](https://airflow.apache.org/docs/apache-airflow-providers-http/stable/index.html) (v2.0.2): 

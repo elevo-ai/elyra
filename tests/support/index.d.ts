@@ -19,7 +19,9 @@ declare namespace Cypress {
     installRuntimeConfig(options?: {
       type?: 'kfp' | 'airflow';
     }): Chainable<void>;
-    createRuntimeConfig(options?: { type: 'kfp' | 'airflow' }): Chainable<void>;
+    createRuntimeConfig(options?: {
+      type: 'kfp' | 'airflow' | 'invalid';
+    }): Chainable<void>;
     createExampleComponentCatalog(options?: {
       type: 'kfp' | 'airflow';
     }): Chainable<void>;
@@ -38,5 +40,10 @@ declare namespace Cypress {
     checkTabMenuOptions(fileType: string): Chainable<void>;
     closeTab(index: number): Chainable<void>;
     createNewScriptEditor(language: string): Chainable<void>;
+    checkScriptEditorToolbarContent(): Chainable<void>;
+    checkRightClickTabContent(fileType: string): Chainable<void>;
+    openFileAndCheckContent(fileExtension: string): Chainable<void>;
+    openHelloWorld(fileExtension: string): Chainable<void>;
+    dismissAssistant(fileType: string): Chainable<void>;
   }
 }
