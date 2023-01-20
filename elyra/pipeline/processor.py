@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+from __future__ import annotations
+
 from abc import abstractmethod
 import ast
 import asyncio
@@ -20,6 +22,7 @@ import functools
 import os
 from pathlib import Path
 import time
+from typing import Any
 from typing import Dict
 from typing import List
 from typing import Optional
@@ -40,6 +43,14 @@ from elyra.pipeline.component_catalog import ComponentCache
 from elyra.pipeline.pipeline import GenericOperation
 from elyra.pipeline.pipeline import Operation
 from elyra.pipeline.pipeline import Pipeline
+from elyra.pipeline.properties import CustomSharedMemorySize
+from elyra.pipeline.properties import DisableNodeCaching
+from elyra.pipeline.properties import EnvironmentVariable
+from elyra.pipeline.properties import KubernetesAnnotation
+from elyra.pipeline.properties import KubernetesLabel
+from elyra.pipeline.properties import KubernetesSecret
+from elyra.pipeline.properties import KubernetesToleration
+from elyra.pipeline.properties import VolumeMount
 from elyra.pipeline.runtime_type import RuntimeProcessorType
 from elyra.pipeline.runtime_type import RuntimeTypeResources
 from elyra.util.archive import create_temp_archive
@@ -50,7 +61,7 @@ elyra_log_pipeline_info = os.getenv("ELYRA_LOG_PIPELINE_INFO", True)
 
 
 class PipelineProcessorRegistry(SingletonConfigurable):
-    _processors: Dict[str, "PipelineProcessor"] = {}
+    _processors: Dict[str, PipelineProcessor] = {}
 
     def __init__(self, **kwargs):
         root_dir: Optional[str] = kwargs.pop("root_dir", None)
@@ -81,6 +92,9 @@ class PipelineProcessorRegistry(SingletonConfigurable):
             return self._processors[processor_name]
         else:
             raise RuntimeError(f"Could not find pipeline processor '{processor_name}'")
+
+    def get_all_processors(self) -> List[PipelineProcessor]:
+        return list(self._processors.values())
 
     def is_valid_processor(self, processor_name: str) -> bool:
         return processor_name in self._processors.keys()
@@ -119,6 +133,9 @@ class PipelineProcessorManager(SingletonConfigurable):
         processor = self._registry.get_processor(runtime_name)
         return processor
 
+    def get_all_processors(self) -> List[PipelineProcessor]:
+        return self._registry.get_all_processors()
+
     def is_supported_runtime(self, runtime_name: str) -> bool:
         return self._registry.is_valid_processor(runtime_name)
 
@@ -156,6 +173,26 @@ class PipelineProcessorManager(SingletonConfigurable):
             None, processor.export, pipeline, pipeline_export_format, pipeline_export_path, overwrite
         )
         return res
+
+    def supports_pipeline_params(self, runtime_type: RuntimeProcessorType) -> bool:
+        """
+        Returns boolean indicating whether this runtime type supports pipeline parameters.
+        """
+        return self.get_pipeline_parameter_class(runtime_type) is not None
+
+    def get_pipeline_parameter_class(self, runtime_type: RuntimeProcessorType) -> Optional[type]:
+        """
+        Retrieve the appropriate pipeline parameter class for the given runtime processor type.
+
+        NOTE: Not supported for generic pipelines; generic pipeline functionality
+            should be a subset of runtime-specific functionality.
+        """
+        for processor in self.get_all_processors():
+            if runtime_type != processor.type:
+                continue
+            if hasattr(processor, "pipeline_parameter_class"):
+                return processor.pipeline_parameter_class
+        return None
 
 
 class PipelineProcessorResponse:
@@ -353,13 +390,13 @@ class PipelineProcessor(LoggingConfigurable):  # ABC
 
 
 class RuntimePipelineProcessor(PipelineProcessor):
-    def _get_dependency_archive_name(self, operation: Operation) -> str:
+    def _get_dependency_archive_name(self, operation: GenericOperation) -> str:
         return f"{Path(operation.filename).stem}-{operation.id}.tar.gz"
 
-    def _get_dependency_source_dir(self, operation: Operation) -> str:
+    def _get_dependency_source_dir(self, operation: GenericOperation) -> str:
         return str(Path(self.root_dir) / Path(operation.filename).parent)
 
-    def _generate_dependency_archive(self, operation: Operation) -> Optional[str]:
+    def _generate_dependency_archive(self, operation: GenericOperation) -> Optional[str]:
         archive_artifact_name = self._get_dependency_archive_name(operation)
         archive_source_dir = self._get_dependency_source_dir(operation)
 
@@ -377,7 +414,7 @@ class RuntimePipelineProcessor(PipelineProcessor):
         return archive_artifact
 
     def _upload_dependencies_to_object_store(
-        self, runtime_configuration: str, pipeline_name: str, operation: Operation, prefix: str = ""
+        self, runtime_configuration: str, pipeline_name: str, operation: GenericOperation, prefix: str = ""
     ) -> None:
         """
         Create dependency archive for the generic operation identified by operation
@@ -530,7 +567,7 @@ class RuntimePipelineProcessor(PipelineProcessor):
 
     def _process_dictionary_value(self, value: str) -> Union[Dict, str]:
         """
-        For component parameters of type dictionary, the user-entered string value given in the pipeline
+        For component properties of type dictionary, the user-entered string value given in the pipeline
         JSON should be converted to the appropriate Dict format, if possible. If a Dict cannot be formed,
         log and return stripped string value.
         """
@@ -550,14 +587,14 @@ class RuntimePipelineProcessor(PipelineProcessor):
 
         # Value could not be successfully converted to dictionary
         if not isinstance(converted_dict, dict):
-            self.log.debug(f"Could not convert entered parameter value `{value}` to dictionary")
+            self.log.debug(f"Could not convert entered property value `{value}` to dictionary")
             return value
 
         return converted_dict
 
     def _process_list_value(self, value: str) -> Union[List, str]:
         """
-        For component parameters of type list, the user-entered string value given in the pipeline JSON
+        For component properties of type list, the user-entered string value given in the pipeline JSON
         should be converted to the appropriate List format, if possible. If a List cannot be formed,
         log and return stripped string value.
         """
@@ -577,7 +614,39 @@ class RuntimePipelineProcessor(PipelineProcessor):
 
         # Value could not be successfully converted to list
         if not isinstance(converted_list, list):
-            self.log.debug(f"Could not convert entered parameter value `{value}` to list")
+            self.log.debug(f"Could not convert entered property value `{value}` to list")
             return value
 
         return converted_list
+
+    def add_disable_node_caching(self, instance: DisableNodeCaching, execution_object: Any, **kwargs) -> None:
+        """Add DisableNodeCaching info to the execution object for the given runtime processor"""
+        pass
+
+    def add_custom_shared_memory_size(self, instance: CustomSharedMemorySize, execution_object: Any, **kwargs) -> None:
+        """Add CustomSharedMemorySize info to the execution object for the given runtime processor"""
+        pass
+
+    def add_env_var(self, instance: EnvironmentVariable, execution_object: Any, **kwargs) -> None:
+        """Add EnvironmentVariable instance to the execution object for the given runtime processor"""
+        pass
+
+    def add_kubernetes_secret(self, instance: KubernetesSecret, execution_object: Any, **kwargs) -> None:
+        """Add KubernetesSecret instance to the execution object for the given runtime processor"""
+        pass
+
+    def add_mounted_volume(self, instance: VolumeMount, execution_object: Any, **kwargs) -> None:
+        """Add VolumeMount instance to the execution object for the given runtime processor"""
+        pass
+
+    def add_kubernetes_pod_annotation(self, instance: KubernetesAnnotation, execution_object: Any, **kwargs) -> None:
+        """Add KubernetesAnnotation instance to the execution object for the given runtime processor"""
+        pass
+
+    def add_kubernetes_pod_label(self, instance: KubernetesLabel, execution_object: Any, **kwargs) -> None:
+        """Add KubernetesLabel instance to the execution object for the given runtime processor"""
+        pass
+
+    def add_kubernetes_toleration(self, instance: KubernetesToleration, execution_object: Any, **kwargs) -> None:
+        """Add KubernetesToleration instance to the execution object for the given runtime processor"""
+        pass

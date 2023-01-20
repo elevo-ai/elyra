@@ -31,7 +31,7 @@ from kfp import Client as ArgoClient
 
 from elyra._version import __version__
 from elyra.metadata.manager import MetadataManager
-from elyra.metadata.schema import SchemaManager
+from elyra.metadata.metadata import Metadata
 from elyra.metadata.schemaspaces import Runtimes
 from elyra.pipeline import pipeline_constants
 from elyra.pipeline.component_catalog import ComponentCache
@@ -43,9 +43,9 @@ from elyra.pipeline.pipeline_definition import Pipeline
 from elyra.pipeline.pipeline_definition import PipelineDefinition
 from elyra.pipeline.processor import PipelineProcessorManager
 from elyra.pipeline.processor import PipelineProcessorResponse
+from elyra.pipeline.properties import VolumeMount
 from elyra.pipeline.runtime_type import RuntimeProcessorType
 from elyra.pipeline.runtime_type import RuntimeTypeResources
-from elyra.pipeline.runtimes_metadata import RuntimesMetadata
 from elyra.pipeline.validation import PipelineValidationManager
 from elyra.pipeline.validation import ValidationSeverity
 
@@ -65,10 +65,10 @@ SEVERITY = {
 }
 
 
-def _get_runtime_config(runtime_config_name: Optional[str]) -> Optional[RuntimesMetadata]:
+def _get_runtime_config(runtime_config_name: Optional[str]) -> Optional[Metadata]:
     """Fetch runtime configuration for the specified name"""
-    if not runtime_config_name or runtime_config_name == "local":
-        # No runtime configuration was specified or it is local.
+    if not runtime_config_name:
+        # No runtime configuration was specified so treat as local.
         # Cannot use metadata manager to determine the runtime type.
         return None
     try:
@@ -88,29 +88,14 @@ def _get_runtime_type(runtime_config_name: Optional[str]) -> Optional[str]:
 
 def _get_runtime_schema_name(runtime_config_name: Optional[str]) -> Optional[str]:
     """Get runtime schema name for the provided runtime configuration name"""
-    if not runtime_config_name or runtime_config_name == "local":
-        # No runtime configuration was specified or it is local.
+    if not runtime_config_name:
+        # No runtime configuration was specified so treat as local.
         # Cannot use metadata manager to determine the runtime type.
         return "local"
     runtime_config = _get_runtime_config(runtime_config_name)
     if runtime_config:
         return runtime_config.schema_name
     return None
-
-
-def _get_runtime_display_name(schema_name: Optional[str]) -> Optional[str]:
-    """Return the display name for the specified runtime schema_name"""
-    if not schema_name or schema_name == "local":
-        # No schame name was  specified or it is local.
-        # Cannot use metadata manager to determine the display name.
-        return schema_name
-
-    try:
-        schema_manager = SchemaManager.instance()
-        schema = schema_manager.get_schema(Runtimes.RUNTIMES_SCHEMASPACE_NAME, schema_name)
-        return schema["display_name"]
-    except Exception as e:
-        raise click.ClickException(f"Invalid runtime configuration: {schema_name}\n {e}")
 
 
 def _get_pipeline_runtime_type(pipeline_definition: dict) -> Optional[str]:
@@ -294,7 +279,7 @@ def pipeline():
 @click.command()
 @click.option("--runtime-config", required=False, help="Runtime config where the pipeline should be processed")
 @click.argument("pipeline_path", type=Path, callback=validate_pipeline_path)
-def validate(pipeline_path, runtime_config="local"):
+def validate(pipeline_path: str, runtime_config: Optional[str] = None):
     """
     Validate pipeline
     """
@@ -303,13 +288,10 @@ def validate(pipeline_path, runtime_config="local"):
     print_banner("Elyra Pipeline Validation")
 
     runtime = _get_runtime_schema_name(runtime_config)
-
-    pipeline_definition = _preprocess_pipeline(pipeline_path, runtime=runtime, runtime_config=runtime_config)
-
-    pipeline_runtime_type = _get_pipeline_runtime_type(pipeline_definition)
-    if pipeline_runtime_type:
+    if runtime != "local":
         _build_component_cache()
 
+    pipeline_definition = _preprocess_pipeline(pipeline_path, runtime=runtime, runtime_config=runtime_config)
     try:
         _validate_pipeline_definition(pipeline_definition)
     except Exception:
@@ -364,17 +346,13 @@ def submit(json_option, pipeline_path, runtime_config_name, monitor_option, time
     print_banner("Elyra Pipeline Submission")
 
     runtime_config = _get_runtime_config(runtime_config_name)
-
     runtime_schema = runtime_config.schema_name
+    if runtime_schema != "local":
+        _build_component_cache()
 
     pipeline_definition = _preprocess_pipeline(
         pipeline_path, runtime=runtime_schema, runtime_config=runtime_config_name
     )
-
-    pipeline_runtime_type = _get_pipeline_runtime_type(pipeline_definition)
-    if pipeline_runtime_type:
-        _build_component_cache()
-
     try:
         _validate_pipeline_definition(pipeline_definition)
     except Exception:
@@ -481,7 +459,7 @@ def run(json_option, pipeline_path):
 
     print_banner("Elyra Pipeline Local Run")
 
-    pipeline_definition = _preprocess_pipeline(pipeline_path, runtime="local", runtime_config="local")
+    pipeline_definition = _preprocess_pipeline(pipeline_path, runtime="local")
 
     try:
         _validate_pipeline_definition(pipeline_definition)
@@ -507,7 +485,7 @@ def describe(json_option, pipeline_path):
     Display pipeline summary and dependencies.
     """
 
-    pipeline_definition = _preprocess_pipeline(pipeline_path, runtime="local", runtime_config="local")
+    pipeline_definition = _preprocess_pipeline(pipeline_path, runtime="local")
 
     primary_pipeline = PipelineDefinition(pipeline_definition=pipeline_definition).primary_pipeline
 
@@ -591,7 +569,11 @@ def describe(json_option, pipeline_path):
         # (... there are none today)
         # volumes
         for vm in node.get_component_parameter(pipeline_constants.MOUNTED_VOLUMES, []):
-            describe_dict["volume_dependencies"]["value"].add(vm.pvc_name)
+            # The below is a workaround until https://github.com/elyra-ai/elyra/issues/2919 is fixed
+            if not isinstance(vm, (VolumeMount, dict)):
+                continue
+            pvc_name = vm.pvc_name if isinstance(vm, VolumeMount) else vm.get("pvc_name")
+            describe_dict["volume_dependencies"]["value"].add(pvc_name)
 
         if Operation.is_generic_operation(node.op):
             # update stats that are specific to generic components
@@ -622,6 +604,9 @@ def describe(json_option, pipeline_path):
             describe_dict["custom_node_count"]["value"] = describe_dict["custom_node_count"]["value"] + 1
             # component dependencies
             describe_dict["component_dependencies"]["value"].add(node.component_source)
+            for value in node.get_all_component_parameters().values():
+                if isinstance(value, dict) and value.get("widget", "") == "file":
+                    describe_dict["file_dependencies"]["value"].add(value.get("value"))
 
     #
     # produce output in the requested human-readable or machine-readable format
@@ -685,10 +670,16 @@ def describe(json_option, pipeline_path):
     "--output",
     required=False,
     type=Path,
-    help="Exported file name (including optional path). Defaults to " " the current directory and the pipeline name.",
+    help="Exported file name (including optional path). Defaults to the current directory and the pipeline name.",
+)
+@click.option(
+    "--format",
+    required=False,
+    type=str,
+    help="File export format.",
 )
 @click.option("--overwrite", is_flag=True, help="Overwrite output file if it already exists.")
-def export(pipeline_path, runtime_config, output, overwrite):
+def export(pipeline_path, runtime_config, output, format, overwrite):
     """
     Export a pipeline to a runtime-specific format
     """
@@ -697,8 +688,10 @@ def export(pipeline_path, runtime_config, output, overwrite):
     print_banner("Elyra pipeline export")
 
     rtc = _get_runtime_config(runtime_config)
-    runtime_schema = rtc.schema_name
     runtime_type = rtc.metadata.get("runtime_type")
+    runtime_schema = rtc.schema_name
+    if runtime_schema != "local":
+        _build_component_cache()
 
     pipeline_definition = _preprocess_pipeline(pipeline_path, runtime=runtime_schema, runtime_config=runtime_config)
 
@@ -712,14 +705,20 @@ def export(pipeline_path, runtime_config, output, overwrite):
             param_hint="--runtime-config",
         )
 
+    # Determine which export format(s) the runtime processor supports
     resources = RuntimeTypeResources.get_instance_by_type(RuntimeProcessorType.get_instance_by_name(runtime_type))
     supported_export_formats = resources.get_export_extensions()
     if len(supported_export_formats) == 0:
         raise click.ClickException(f"Runtime type '{runtime_type}' does not support export.")
 
-    # If, in the future, a runtime supports multiple export output formats,
-    # the user can choose one. For now, choose the only option.
-    selected_export_format = supported_export_formats[0]
+    # Verify that the user selected a valid format. If none was specified,
+    # the first from the supported list is selected as default.
+    selected_export_format = (format or supported_export_formats[0]).lower()
+    if selected_export_format not in supported_export_formats:
+        raise click.BadParameter(
+            f"Valid export formats are {supported_export_formats}.",
+            param_hint="--format",
+        )
     selected_export_format_suffix = f".{selected_export_format}"
 
     # generate output file name from the user-provided input
@@ -751,9 +750,6 @@ def export(pipeline_path, runtime_config, output, overwrite):
         raise click.ClickException(
             f"Output file '{str(output_file)}' exists and " "option '--overwrite' was not specified."
         )
-
-    if pipeline_runtime_type:
-        _build_component_cache()
 
     # validate the pipeline
     try:

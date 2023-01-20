@@ -1,13 +1,4 @@
-/* 
- * This program is an unpublished work fully protected by the United States
- * copyright laws and is considered a trade secret belonging to Attala Systems Corporation.
- * To the extent that this work may be considered "published", the following notice applies
- * "(C) 2020, 2021, Attala Systems Corporation"
- *
- * Any unauthorized use, reproduction, distribution, display, modification,
- * or disclosure of this program is strictly prohibited.
- *
- *
+/*
  * Copyright 2018-2022 Elyra Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -38,11 +29,7 @@ import {
   JupyterFrontEndPlugin,
   ILabStatus
 } from '@jupyterlab/application';
-import {
-  IThemeManager,
-  ICommandPalette,
-  MainAreaWidget
-} from '@jupyterlab/apputils';
+import { ICommandPalette, MainAreaWidget } from '@jupyterlab/apputils';
 import { IEditorServices } from '@jupyterlab/codeeditor';
 import { ITranslator } from '@jupyterlab/translation';
 import {
@@ -75,15 +62,13 @@ const extension: JupyterFrontEndPlugin<void> = {
     IFormComponentRegistry,
     ITranslator
   ],
-  optional: [IThemeManager],
   activate: async (
     app: JupyterFrontEnd,
     palette: ICommandPalette,
     editorServices: IEditorServices,
     status: ILabStatus,
     componentRegistry: IFormComponentRegistry,
-    translator: ITranslator,
-    themeManager?: IThemeManager
+    translator: ITranslator
   ) => {
     console.log('Elyra - metadata extension is activated!');
 
@@ -124,7 +109,6 @@ const extension: JupyterFrontEndPlugin<void> = {
         schemaName: args.schema,
         editorServices,
         status,
-        themeManager,
         translator: translator.load('jupyterlab'),
         componentRegistry
       });
@@ -138,6 +122,11 @@ const extension: JupyterFrontEndPlugin<void> = {
     };
 
     app.commands.addCommand(`${METADATA_EDITOR_ID}:open`, {
+      label: (args: any) => {
+        return `New ${args.title} ${
+          args.appendToTitle ? args.titleContext : ''
+        }`;
+      },
       execute: (args: any) => {
         openMetadataEditor(args);
       }
@@ -152,7 +141,6 @@ const extension: JupyterFrontEndPlugin<void> = {
       const widgetId = `${METADATA_WIDGET_ID}:${args.schemaspace}`;
       const metadataWidget = new MetadataWidget({
         app,
-        themeManager,
         display_name: args.display_name,
         schemaspace: args.schemaspace,
         icon: labIcon

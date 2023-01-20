@@ -17,6 +17,8 @@
 import json
 from pathlib import Path
 import shutil
+from typing import List
+from typing import Union
 
 from click.testing import CliRunner
 from conftest import KFP_COMPONENT_CACHE_INSTANCE
@@ -335,8 +337,8 @@ def test_describe_notebooks_scripts_report():
     result = runner.invoke(pipeline, ["describe", str(pipeline_file_path)])
     assert result.exit_code == 0
     assert "Notebook dependencies:\n" in result.output
-    assert "notebooks/notebook_1.ipyn" in result.output
-    assert "notebooks/notebook_2.ipyn" in result.output
+    assert "notebooks/notebook_1.ipynb" in result.output
+    assert "notebooks/notebook_2.ipynb" in result.output
     # Ensure no entries for scripts
     assert "Script dependencies: None specified" in result.output
     assert "Number of generic nodes: 2" in result.output
@@ -366,8 +368,8 @@ def test_describe_notebooks_scripts_report():
     result = runner.invoke(pipeline, ["describe", str(pipeline_file_path)])
     assert result.exit_code == 0
     assert "Notebook dependencies:\n" in result.output
-    assert "notebooks/notebook_1.ipyn" in result.output
-    assert "notebooks/notebook_2.ipyn" in result.output
+    assert "notebooks/notebook_1.ipynb" in result.output
+    assert "notebooks/notebook_2.ipynb" in result.output
     assert "Script dependencies:\n" in result.output
     assert "scripts/script_1.py" in result.output
     assert "scripts/script_2.py" in result.output
@@ -883,8 +885,10 @@ def test_describe_custom_component_dependencies_json():
 # ------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("catalog_instance", [KFP_COMPONENT_CACHE_INSTANCE], indirect=True)
-def test_validate_with_kfp_components(jp_environ, kubeflow_pipelines_runtime_instance, catalog_instance):
+@pytest.mark.parametrize("catalog_instance_no_server_process", [KFP_COMPONENT_CACHE_INSTANCE], indirect=True)
+def test_validate_with_kfp_components(
+    jp_environ, kubeflow_pipelines_runtime_instance, catalog_instance_no_server_process
+):
     runner = CliRunner()
     pipeline_file_path = Path(__file__).parent / "resources" / "pipelines" / "kfp_3_node_custom.pipeline"
     result = runner.invoke(
@@ -1008,6 +1012,14 @@ def prepare_export_work_dir(work_dir: str, source_dir: str):
     print(f"Work directory content: {list(Path(work_dir).glob('*'))}")
 
 
+def copy_to_work_dir(work_dir: str, files: List[Union[str, Path]]) -> None:
+    """Copies the specified files to work_dir"""
+    for file in files:
+        if not isinstance(file, Path):
+            file = Path(file)
+        shutil.copy(file.as_posix(), work_dir)
+
+
 def test_export_invalid_runtime_config():
     """Test user error scenarios: the specified runtime configuration is 'invalid'"""
     runner = CliRunner()
@@ -1066,8 +1078,10 @@ def test_export_incompatible_runtime_config(kubeflow_pipelines_runtime_instance,
     )
 
 
-@pytest.mark.parametrize("catalog_instance", [KFP_COMPONENT_CACHE_INSTANCE], indirect=True)
-def test_export_kubeflow_output_option(jp_environ, kubeflow_pipelines_runtime_instance, catalog_instance):
+@pytest.mark.parametrize("catalog_instance_no_server_process", [KFP_COMPONENT_CACHE_INSTANCE], indirect=True)
+def test_export_kubeflow_output_option(
+    jp_environ, kubeflow_pipelines_runtime_instance, catalog_instance_no_server_process
+):
     """Verify that the '--output' option works as expected for Kubeflow Pipelines"""
     runner = CliRunner()
     with runner.isolated_filesystem():
@@ -1078,7 +1092,6 @@ def test_export_kubeflow_output_option(jp_environ, kubeflow_pipelines_runtime_in
         pipeline_file_path = cwd / pipeline_file
         # make sure the pipeline file exists
         assert pipeline_file_path.is_file() is True
-        print(f"Pipeline file: {pipeline_file_path}")
 
         # Test: '--output' not specified; exported file is created
         # in current directory and named like the pipeline file with
@@ -1143,7 +1156,6 @@ def test_export_airflow_output_option(airflow_runtime_instance):
         pipeline_file_path = cwd / pipeline_file
         # make sure the pipeline file exists
         assert pipeline_file_path.is_file() is True
-        print(f"Pipeline file: {pipeline_file_path}")
 
         #
         # Test: '--output' not specified; exported file is created
@@ -1151,7 +1163,6 @@ def test_export_airflow_output_option(airflow_runtime_instance):
         # a '.py' suffix
         #
         expected_output_file = pipeline_file_path.with_suffix(".py")
-        print(f"expected_output_file -> {expected_output_file}")
         do_mock_export(str(expected_output_file))
 
         # this should fail: default output file already exists
@@ -1217,8 +1228,10 @@ def test_export_airflow_output_option(airflow_runtime_instance):
         ), result.output
 
 
-@pytest.mark.parametrize("catalog_instance", [KFP_COMPONENT_CACHE_INSTANCE], indirect=True)
-def test_export_kubeflow_overwrite_option(jp_environ, kubeflow_pipelines_runtime_instance, catalog_instance):
+@pytest.mark.parametrize("catalog_instance_no_server_process", [KFP_COMPONENT_CACHE_INSTANCE], indirect=True)
+def test_export_kubeflow_overwrite_option(
+    jp_environ, kubeflow_pipelines_runtime_instance, catalog_instance_no_server_process
+):
     """Verify that the '--overwrite' option works as expected for Kubeflow Pipelines"""
     runner = CliRunner()
     with runner.isolated_filesystem():
@@ -1264,6 +1277,110 @@ def test_export_kubeflow_overwrite_option(jp_environ, kubeflow_pipelines_runtime
 
         assert result.exit_code == 0, result.output
         assert f"was exported to '{str(expected_output_file)}" in result.output, result.output
+
+
+def test_export_airflow_format_option(airflow_runtime_instance):
+    """Verify that the '--format' option works as expected for Airflow"""
+    runner = CliRunner()
+    with runner.isolated_filesystem():
+        cwd = Path.cwd().resolve()
+        # copy pipeline file and depencencies
+        resource_dir = Path(__file__).parent / "resources" / "pipelines"
+        copy_to_work_dir(str(cwd), [resource_dir / "airflow.pipeline", resource_dir / "hello.ipynb"])
+        pipeline_file = "airflow.pipeline"
+        pipeline_file_path = cwd / pipeline_file
+        # make sure the pipeline file exists
+        assert pipeline_file_path.is_file() is True
+
+        # Try supported formats
+        for supported_export_format_value in ["yaml", "py"]:
+            if supported_export_format_value:
+                expected_output_file = pipeline_file_path.with_suffix(f".{supported_export_format_value}")
+            else:
+                expected_output_file = pipeline_file_path.with_suffix(".py")
+
+            # Make sure the output file doesn't exist yet
+            if expected_output_file.is_file():
+                expected_output_file.unlink()
+
+        # Try invalid format
+        for invalid_export_format_value in ["humpty", "dumpty"]:
+            options = [
+                "export",
+                str(pipeline_file_path),
+                "--runtime-config",
+                airflow_runtime_instance,
+                "--format",
+                invalid_export_format_value,
+            ]
+
+            # this should fail
+            result = runner.invoke(pipeline, options)
+
+            assert result.exit_code == 2, result.output
+            assert "Invalid value for --format: Valid export formats are ['py']." in result.output, result.output
+
+
+@pytest.mark.parametrize("catalog_instance_no_server_process", [KFP_COMPONENT_CACHE_INSTANCE], indirect=True)
+def test_export_kubeflow_format_option(
+    jp_environ, kubeflow_pipelines_runtime_instance, catalog_instance_no_server_process
+):
+    """Verify that the '--format' option works as expected for Kubeflow Pipelines"""
+    runner = CliRunner()
+    with runner.isolated_filesystem():
+        cwd = Path.cwd().resolve()
+        # copy pipeline file and depencencies
+        prepare_export_work_dir(str(cwd), Path(__file__).parent / "resources" / "pipelines")
+        pipeline_file = "kfp_3_node_custom.pipeline"
+        pipeline_file_path = cwd / pipeline_file
+        # make sure the pipeline file exists
+        assert pipeline_file_path.is_file() is True
+
+        # Try supported formats
+        for supported_export_format_value in [None, "py", "yaml"]:
+            if supported_export_format_value:
+                expected_output_file = pipeline_file_path.with_suffix(f".{supported_export_format_value}")
+            else:
+                expected_output_file = pipeline_file_path.with_suffix(".yaml")
+
+            # Make sure the output file doesn't exist yet
+            if expected_output_file.is_file():
+                expected_output_file.unlink()
+
+            options = [
+                "export",
+                str(pipeline_file_path),
+                "--runtime-config",
+                kubeflow_pipelines_runtime_instance,
+            ]
+            if supported_export_format_value:
+                options.append("--format")
+                options.append(supported_export_format_value)
+
+            # this should succeed
+            result = runner.invoke(pipeline, options)
+
+            assert result.exit_code == 0, result.output
+            assert f"was exported to '{str(expected_output_file)}" in result.output, result.output
+
+        # Try invalid format
+        for invalid_export_format_value in ["humpty", "dumpty"]:
+            options = [
+                "export",
+                str(pipeline_file_path),
+                "--runtime-config",
+                kubeflow_pipelines_runtime_instance,
+                "--format",
+                invalid_export_format_value,
+            ]
+
+            # this should fail
+            result = runner.invoke(pipeline, options)
+
+            assert result.exit_code == 2, result.output
+            assert (
+                "Invalid value for --format: Valid export formats are ['yaml', 'py']." in result.output
+            ), result.output
 
 
 # ------------------------------------------------------------------

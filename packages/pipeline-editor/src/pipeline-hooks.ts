@@ -15,10 +15,8 @@
  */
 
 import { MetadataService, RequestHandler } from '@elyra/services';
-import { pyIcon, rIcon } from '@elyra/ui-components';
 import { URLExt } from '@jupyterlab/coreutils';
 import { ServerConnection } from '@jupyterlab/services';
-import { notebookIcon } from '@jupyterlab/ui-components';
 import produce from 'immer';
 import useSWR from 'swr';
 
@@ -72,6 +70,7 @@ interface IRuntimeComponentsResponse {
   version: string;
   categories: IRuntimeComponent[];
   properties: IComponentPropertiesResponse;
+  parameters: IComponentPropertiesResponse;
 }
 
 export interface IRuntimeComponent {
@@ -148,18 +147,9 @@ export const sortPalette = (palette: {
 
 // TODO: This should be enabled through `extensions`
 const NodeIcons: Map<string, string> = new Map([
-  [
-    'execute-notebook-node',
-    'data:image/svg+xml;utf8,' + encodeURIComponent(notebookIcon.svgstr)
-  ],
-  [
-    'execute-python-node',
-    'data:image/svg+xml;utf8,' + encodeURIComponent(pyIcon.svgstr)
-  ],
-  [
-    'execute-r-node',
-    'data:image/svg+xml;utf8,' + encodeURIComponent(rIcon.svgstr)
-  ]
+  ['execute-notebook-node', 'static/elyra/notebook.svg'],
+  ['execute-python-node', 'static/elyra/python.svg'],
+  ['execute-r-node', 'static/elyra/r-logo.svg']
 ]);
 
 // TODO: We should decouple components and properties to support lazy loading.
@@ -173,15 +163,26 @@ export const componentFetcher = async (type: string): Promise<any> => {
     IComponentPropertiesResponse
   >(`elyra/pipeline/${type}/properties`);
 
+  const pipelineParametersPromise = RequestHandler.makeGetRequest<
+    IComponentPropertiesResponse
+  >(`elyra/pipeline/${type}/parameters`);
+
   const typesPromise = PipelineService.getRuntimeTypes();
 
-  const [palette, pipelineProperties, types] = await Promise.all([
+  const [
+    palette,
+    pipelineProperties,
+    pipelineParameters,
+    types
+  ] = await Promise.all([
     palettePromise,
     pipelinePropertiesPromise,
+    pipelineParametersPromise,
     typesPromise
   ]);
 
   palette.properties = pipelineProperties;
+  palette.parameters = pipelineParameters;
 
   // Gather list of component IDs to fetch properties for.
   const componentList: string[] = [];
@@ -213,18 +214,18 @@ export const componentFetcher = async (type: string): Promise<any> => {
       category.node_types?.[0]?.runtime_type ?? 'LOCAL';
 
     const type = types.find((t: any) => t.id === category_runtime_type);
-    const defaultIcon = URLExt.parse(
-      URLExt.join(ServerConnection.makeSettings().baseUrl, type?.icon || '')
-    ).pathname;
+    const baseUrl = ServerConnection.makeSettings().baseUrl;
+    const defaultIcon = URLExt.parse(URLExt.join(baseUrl, type?.icon || ''))
+      .pathname;
 
     category.image = defaultIcon;
 
     for (const node of category.node_types) {
       // update icon
-      let nodeIcon = NodeIcons.get(node.op);
-      if (nodeIcon === undefined || nodeIcon === '') {
-        nodeIcon = defaultIcon;
-      }
+      const genericNodeIcon = NodeIcons.get(node.op);
+      const nodeIcon = genericNodeIcon
+        ? URLExt.parse(URLExt.join(baseUrl, genericNodeIcon)).pathname
+        : defaultIcon;
 
       // Not sure which is needed...
       node.image = nodeIcon;
@@ -245,9 +246,9 @@ const updateRuntimeImages = (
   properties: any,
   runtimeImages: IRuntimeImage[] | undefined
 ): void => {
-  const runtimeImageIndex = properties.uihints.parameter_info.findIndex(
-    (p: any) => p.parameter_ref === 'elyra_runtime_image'
-  );
+  const runtimeImageProperties =
+    properties?.properties?.component_parameters?.properties?.runtime_image ??
+    properties?.properties?.pipeline_defaults?.properties?.runtime_image;
 
   const imageNames = (runtimeImages ?? []).map(i => i.metadata.image_name);
 
@@ -257,13 +258,11 @@ const updateRuntimeImages = (
     displayNames[i.metadata.image_name] = i.display_name;
   });
 
-  if (runtimeImageIndex !== -1) {
-    properties.uihints.parameter_info[
-      runtimeImageIndex
-    ].data.labels = displayNames;
-    properties.uihints.parameter_info[
-      runtimeImageIndex
-    ].data.items = imageNames;
+  if (runtimeImageProperties) {
+    runtimeImageProperties.enumNames = (runtimeImages ?? []).map(
+      i => i.display_name
+    );
+    runtimeImageProperties.enum = imageNames;
   }
 };
 

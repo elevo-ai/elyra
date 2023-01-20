@@ -13,10 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-from dataclasses import asdict as dataclass_asdict
-from dataclasses import dataclass
-from dataclasses import is_dataclass
-import json
+from __future__ import annotations
+
 import os
 import sys
 from typing import Any
@@ -25,14 +23,14 @@ from typing import List
 from typing import Optional
 
 from elyra.pipeline.pipeline_constants import ENV_VARIABLES
-from elyra.pipeline.pipeline_constants import KUBERNETES_POD_ANNOTATIONS
-from elyra.pipeline.pipeline_constants import KUBERNETES_SECRETS
-from elyra.pipeline.pipeline_constants import KUBERNETES_TOLERATIONS
-from elyra.pipeline.pipeline_constants import MOUNTED_VOLUMES
+from elyra.pipeline.pipeline_constants import PIPELINE_PARAMETERS
+from elyra.pipeline.pipeline_constants import RUNTIME_IMAGE
+from elyra.pipeline.properties import ElyraPropertyList
+from elyra.pipeline.properties import EnvironmentVariable
 
 # TODO: Make pipeline version available more widely
 # as today is only available on the pipeline editor
-PIPELINE_CURRENT_VERSION = 7
+PIPELINE_CURRENT_VERSION = 8
 PIPELINE_CURRENT_SCHEMA = 3.0
 
 
@@ -51,17 +49,14 @@ class Operation(object):
         name: str,
         classifier: str,
         parent_operation_ids: Optional[List[str]] = None,
-        component_params: Optional[Dict[str, Any]] = None,
-    ) -> "Operation":
+        component_props: Optional[Dict[str, Any]] = None,
+        elyra_props: Optional[Dict[str, Any]] = None,
+    ) -> Operation:
         """Class method that creates the appropriate instance of Operation based on inputs."""
 
         if Operation.is_generic_operation(classifier):
-            return GenericOperation(
-                id, type, name, classifier, parent_operation_ids=parent_operation_ids, component_params=component_params
-            )
-        return Operation(
-            id, type, name, classifier, parent_operation_ids=parent_operation_ids, component_params=component_params
-        )
+            return GenericOperation(id, type, name, classifier, parent_operation_ids, component_props, elyra_props)
+        return Operation(id, type, name, classifier, parent_operation_ids, component_props, elyra_props)
 
     def __init__(
         self,
@@ -70,17 +65,18 @@ class Operation(object):
         name: str,
         classifier: str,
         parent_operation_ids: Optional[List[str]] = None,
-        component_params: Optional[Dict[str, Any]] = None,
+        component_props: Optional[Dict[str, Any]] = None,
+        elyra_props: Optional[Dict[str, Any]] = None,
     ):
         """
-        :param id: Generated UUID, 128 bit number used as a unique identifier
-                   e.g. 123e4567-e89b-12d3-a456-426614174000
+        :param id: Generated UUID, 128 bit number used as a unique identifier, e.g. 123e4567-e89b-12d3-a456-426614174000
         :param type: The type of node e.g. execution_node
         :param classifier: indicates the operation's class
         :param name: The name of the operation
         :param parent_operation_ids: List of parent operation 'ids' required to execute prior to this operation
-        :param component_params: dictionary of parameter key:value pairs that are used in the creation of a
-                                 a non-standard operation instance
+        :param component_props: dictionary of property key:value pairs that are used in the creation of a
+            non-Generic operation instance
+        :param elyra_props: dictionary of property key:value pairs that are owned by Elyra
         """
 
         # Validate that the operation has all required properties
@@ -98,45 +94,13 @@ class Operation(object):
         self._classifier = classifier
         self._name = name
         self._parent_operation_ids = parent_operation_ids or []
-        self._component_params = component_params or {}
+        self._component_props = component_props or {}
+        self._elyra_props = elyra_props or {}
         self._doc = None
 
-        self._mounted_volumes = []
-        param_volumes = component_params.get(MOUNTED_VOLUMES)
-        if (
-            param_volumes is not None
-            and isinstance(param_volumes, list)
-            and (len(param_volumes) == 0 or isinstance(param_volumes[0], VolumeMount))
-        ):
-            # The mounted_volumes property is an Elyra system property (ie, not defined in the component
-            # spec) and must be removed from the component_params dict
-            self._mounted_volumes = self._component_params.pop(MOUNTED_VOLUMES, [])
-
-        self._kubernetes_tolerations = []
-        param_tolerations = component_params.get(KUBERNETES_TOLERATIONS)
-        if (
-            param_tolerations is not None
-            and isinstance(param_tolerations, list)
-            and (len(param_tolerations) == 0 or isinstance(param_tolerations[0], KubernetesToleration))
-        ):
-            # The kubernetes_tolerations property is the Elyra system property (ie, not defined in the component
-            # spec) and must be removed from the component_params dict
-            self._kubernetes_tolerations = self._component_params.pop(KUBERNETES_TOLERATIONS, [])
-
-        self._kubernetes_pod_annotations = []
-        param_annotations = component_params.get(KUBERNETES_POD_ANNOTATIONS)
-        if (
-            param_annotations is not None
-            and isinstance(param_annotations, list)
-            and (len(param_annotations) == 0 or isinstance(param_annotations[0], KubernetesAnnotation))
-        ):
-            # The kubernetes_pod_annotations property is an Elyra system property (ie, not defined in the component
-            # spec) and must be removed from the component_params dict
-            self._kubernetes_pod_annotations = self._component_params.pop(KUBERNETES_POD_ANNOTATIONS, [])
-
         # Scrub the inputs and outputs lists
-        self._component_params["inputs"] = Operation._scrub_list(component_params.get("inputs", []))
-        self._component_params["outputs"] = Operation._scrub_list(component_params.get("outputs", []))
+        self._component_props["inputs"] = Operation._scrub_list(component_props.get("inputs", []))
+        self._component_props["outputs"] = Operation._scrub_list(component_props.get("outputs", []))
 
     @property
     def id(self) -> str:
@@ -171,36 +135,28 @@ class Operation(object):
         return self._parent_operation_ids
 
     @property
-    def component_params(self) -> Optional[Dict[str, Any]]:
-        return self._component_params
+    def component_props(self) -> Optional[Dict[str, Any]]:
+        return self._component_props
 
     @property
-    def component_params_as_dict(self) -> Dict[str, Any]:
-        return self._component_params or {}
+    def component_props_as_dict(self) -> Dict[str, Any]:
+        return self._component_props or {}
 
     @property
-    def mounted_volumes(self) -> List["VolumeMount"]:
-        return self._mounted_volumes
-
-    @property
-    def kubernetes_tolerations(self) -> List["KubernetesToleration"]:
-        return self._kubernetes_tolerations
-
-    @property
-    def kubernetes_pod_annotations(self) -> List["KubernetesAnnotation"]:
-        return self._kubernetes_pod_annotations
+    def elyra_props(self) -> Optional[Dict[str, Any]]:
+        return self._elyra_props or {}
 
     @property
     def inputs(self) -> Optional[List[str]]:
-        return self._component_params.get("inputs")
+        return self._component_props.get("inputs")
 
     @inputs.setter
     def inputs(self, value: List[str]):
-        self._component_params["inputs"] = value
+        self._component_props["inputs"] = value
 
     @property
     def outputs(self) -> Optional[List[str]]:
-        return self._component_params.get("outputs")
+        return self._component_props.get("outputs")
 
     @property
     def is_generic(self) -> bool:
@@ -208,9 +164,9 @@ class Operation(object):
 
     @outputs.setter
     def outputs(self, value: List[str]):
-        self._component_params["outputs"] = value
+        self._component_props["outputs"] = value
 
-    def __eq__(self, other: "Operation") -> bool:
+    def __eq__(self, other: Operation) -> bool:
         if isinstance(self, other.__class__):
             return (
                 self.id == other.id
@@ -218,20 +174,20 @@ class Operation(object):
                 and self.classifier == other.classifier
                 and self.name == other.name
                 and self.parent_operation_ids == other.parent_operation_ids
-                and self.component_params == other.component_params
+                and self.component_props == other.component_props
             )
         return False
 
     def __str__(self) -> str:
-        params = ""
-        for key, value in self.component_params_as_dict.items():
-            params += f"\t{key}: {value}, \n"
+        props = ""
+        for key, value in self.component_props_as_dict.items():
+            props += f"\t{key}: {value}, \n"
 
         return (
             f"componentID : {self.id} \n "
             f"name : {self.name} \n "
             f"parent_operation_ids : {self.parent_operation_ids} \n "
-            f"component_parameters: {{\n{params}}} \n"
+            f"component_properties: {{\n{props}}} \n"
         )
 
     @staticmethod
@@ -262,7 +218,8 @@ class GenericOperation(Operation):
         name: str,
         classifier: str,
         parent_operation_ids: Optional[List[str]] = None,
-        component_params: Optional[Dict[str, Any]] = None,
+        component_props: Optional[Dict[str, Any]] = None,
+        elyra_props: Optional[Dict[str, Any]] = None,
     ):
         """
         :param id: Generated UUID, 128 bit number used as a unique identifier
@@ -271,10 +228,10 @@ class GenericOperation(Operation):
         :param classifier: indicates the operation's class
         :param name: The name of the operation
         :param parent_operation_ids: List of parent operation 'ids' required to execute prior to this operation
-        :param component_params: dictionary of parameter key:value pairs that are used in the creation of a
+        :param component_props: dictionary of property key:value pairs that are used in the creation of a
                                  a non-standard operation instance
 
-        Component_params for "generic components" (i.e., those with one of the following classifier values:
+        component_props for "generic components" (i.e., those with one of the following classifier values:
         ["execute-notebook-node", "execute-python-node", "execute-r-node"]) can expect to have the following
         entries.
                 filename: The relative path to the source file in the users local environment
@@ -284,40 +241,46 @@ class GenericOperation(Operation):
                 dependencies: List of local files/directories needed for the operation to run
                              and packaged into each operation's dependency archive
                 include_subdirectories: Include or Exclude subdirectories when packaging our 'dependencies'
-                env_vars: List of Environmental variables to set in the container image
-                         e.g. FOO="BAR"
+                env_vars: List of Environmental variables to set in the container image, e.g. FOO="BAR"
                 inputs: List of files to be consumed by this operation, produced by parent operation(s)
                 outputs: List of files produced by this operation to be included in a child operation(s)
                 cpu: number of cpus requested to run the operation
                 memory: amount of memory requested to run the operation (in Gi)
                 gpu: number of gpus requested to run the operation
+                parameters: a list of names of pipeline parameters that should be passed to this operation
+                gpu_vendor: gpu resource type, eg. nvidia.com/gpu, amd.com/gpu etc.
         Entries for other (non-built-in) component types are a function of the respective component.
+
+        :param elyra_props: dictionary of property key:value pairs that are owned by Elyra
         """
 
-        super().__init__(
-            id, type, name, classifier, parent_operation_ids=parent_operation_ids, component_params=component_params
-        )
+        super().__init__(id, type, name, classifier, parent_operation_ids, component_props, elyra_props)
 
-        if not component_params.get("filename"):
+        if not component_props.get("filename"):
             raise ValueError("Invalid pipeline operation: Missing field 'operation filename'.")
-        if not component_params.get("runtime_image"):
+        if not component_props.get("runtime_image"):
             raise ValueError("Invalid pipeline operation: Missing field 'operation runtime image'.")
-        if component_params.get("cpu") and not self._validate_range(component_params.get("cpu"), min_value=1):
+        if component_props.get("cpu") and not self._validate_range(component_props.get("cpu"), min_value=1):
             raise ValueError("Invalid pipeline operation: CPU must be a positive value or None")
-        if component_params.get("gpu") and not self._validate_range(component_params.get("gpu"), min_value=0):
+        if component_props.get("gpu") and not self._validate_range(component_props.get("gpu"), min_value=0):
             raise ValueError("Invalid pipeline operation: GPU must be a positive value or None")
-        if component_params.get("memory") and not self._validate_range(component_params.get("memory"), min_value=1):
+        if component_props.get("memory") and not self._validate_range(component_props.get("memory"), min_value=1):
             raise ValueError("Invalid pipeline operation: Memory must be a positive value or None")
 
         # Re-build object to include default values
-        self._component_params["filename"] = component_params.get("filename")
-        self._component_params["runtime_image"] = component_params.get("runtime_image")
-        self._component_params["dependencies"] = Operation._scrub_list(component_params.get("dependencies", []))
-        self._component_params["include_subdirectories"] = component_params.get("include_subdirectories", False)
-        self._component_params["env_vars"] = KeyValueList(Operation._scrub_list(component_params.get("env_vars", [])))
-        self._component_params["cpu"] = component_params.get("cpu")
-        self._component_params["gpu"] = component_params.get("gpu")
-        self._component_params["memory"] = component_params.get("memory")
+        self._component_props["filename"] = component_props.get("filename")
+        self._component_props["runtime_image"] = component_props.get("runtime_image")
+        self._component_props["dependencies"] = Operation._scrub_list(component_props.get("dependencies", []))
+        self._component_props["include_subdirectories"] = component_props.get("include_subdirectories", False)
+        self._component_props["cpu"] = component_props.get("cpu")
+        self._component_props["memory"] = component_props.get("memory")
+        self._component_props["gpu"] = component_props.get("gpu")
+        self._component_props["gpu_vendor"] = component_props.get("gpu_vendor")
+        self._component_props["parameters"] = component_props.get(PIPELINE_PARAMETERS, [])
+
+        if not elyra_props:
+            elyra_props = {}
+        self._elyra_props["env_vars"] = ElyraPropertyList(elyra_props.get(ENV_VARIABLES, []))
 
     @property
     def name(self) -> str:
@@ -331,41 +294,45 @@ class GenericOperation(Operation):
 
     @property
     def filename(self) -> str:
-        return self._component_params.get("filename")
+        return self._component_props.get("filename")
 
     @property
     def runtime_image(self) -> str:
-        return self._component_params.get("runtime_image")
+        return self._component_props.get(RUNTIME_IMAGE)
 
     @property
     def dependencies(self) -> Optional[List[str]]:
-        return self._component_params.get("dependencies")
+        return self._component_props.get("dependencies")
 
     @property
     def include_subdirectories(self) -> Optional[bool]:
-        return self._component_params.get("include_subdirectories")
+        return self._component_props.get("include_subdirectories")
 
     @property
-    def env_vars(self) -> Optional["KeyValueList"]:
-        return self._component_params.get(ENV_VARIABLES)
+    def env_vars(self) -> ElyraPropertyList[EnvironmentVariable]:
+        return self._elyra_props.get(ENV_VARIABLES)
 
     @property
     def cpu(self) -> Optional[str]:
-        return self._component_params.get("cpu")
+        return self._component_props.get("cpu")
 
     @property
     def memory(self) -> Optional[str]:
-        return self._component_params.get("memory")
+        return self._component_props.get("memory")
 
     @property
     def gpu(self) -> Optional[str]:
-        return self._component_params.get("gpu")
+        return self._component_props.get("gpu")
 
     @property
-    def kubernetes_secrets(self) -> List["KubernetesSecret"]:
-        return self._component_params.get(KUBERNETES_SECRETS)
+    def parameters(self) -> Optional[List[str]]:
+        return self._component_props.get("parameters")
 
-    def __eq__(self, other: "GenericOperation") -> bool:
+    @property
+    def gpu_vendor(self) -> Optional[str]:
+        return self._component_props.get("gpu_vendor")
+
+    def __eq__(self, other: GenericOperation) -> bool:
         if isinstance(self, other.__class__):
             return super().__eq__(other)
         return False
@@ -384,10 +351,11 @@ class Pipeline(object):
         id: str,
         name: str,
         runtime: str,
-        runtime_config: str,
+        runtime_config: Optional[str] = None,
         source: Optional[str] = None,
         description: Optional[str] = None,
-        pipeline_parameters: Optional[Dict[str, Any]] = None,
+        pipeline_properties: Optional[Dict[str, Any]] = None,
+        pipeline_parameters: ElyraPropertyList = None,
     ):
         """
         :param id: Generated UUID, 128 bit number used as a unique identifier
@@ -397,15 +365,14 @@ class Pipeline(object):
         :param runtime_config: Runtime configuration that should be used to submit the pipeline to execution
         :param source: The pipeline source, e.g. a pipeline file or a notebook.
         :param description: Pipeline description
-        :param pipeline_parameters: Key/value pairs representing the parameters of this pipeline
+        :param pipeline_properties: Key/value pairs representing the properties of this pipeline
+        :param pipeline_parameters: an ElyraPropertyList of pipeline parameters
         """
 
         if not name:
             raise ValueError("Invalid pipeline: Missing pipeline name.")
         if not runtime:
             raise ValueError("Invalid pipeline: Missing runtime.")
-        if not runtime_config:
-            raise ValueError("Invalid pipeline: Missing runtime configuration.")
 
         self._id = id
         self._name = name
@@ -413,7 +380,8 @@ class Pipeline(object):
         self._source = source
         self._runtime = runtime
         self._runtime_config = runtime_config
-        self._pipeline_parameters = pipeline_parameters or {}
+        self._pipeline_properties = pipeline_properties or {}
+        self._pipeline_parameters = pipeline_parameters or ElyraPropertyList([])
         self._operations = {}
 
     @property
@@ -443,9 +411,16 @@ class Pipeline(object):
         return self._runtime_config
 
     @property
-    def pipeline_parameters(self) -> Dict[str, Any]:
+    def pipeline_properties(self) -> Dict[str, Any]:
         """
-        The dictionary of global parameters associated with each node of the pipeline
+        The dictionary of global properties associated with this pipeline
+        """
+        return self._pipeline_properties
+
+    @property
+    def parameters(self) -> ElyraPropertyList:
+        """
+        The list of parameters associated with this pipeline
         """
         return self._pipeline_parameters
 
@@ -471,139 +446,13 @@ class Pipeline(object):
         return False
 
     def __eq__(self, other: "Pipeline") -> bool:
-        if isinstance(self, other.__class__):
+        if isinstance(other, Pipeline):
             return (
                 self.id == other.id
                 and self.name == other.name
                 and self.source == other.source
                 and self.description == other.description
                 and self.runtime == other.runtime
-                and self.runtime_config == other.runtime_config
                 and self.operations == other.operations
             )
-
-
-class KeyValueList(list):
-    """
-    A list class that exposes functionality specific to lists whose entries are
-    key-value pairs separated by a pre-defined character.
-    """
-
-    _key_value_separator: str = "="
-
-    def to_dict(self) -> Dict[str, str]:
-        """
-        Properties consisting of key-value pairs are stored in a list of separated
-        strings, while most processing steps require a dictionary - so we must convert.
-        If no key/value pairs are specified, an empty dictionary is returned, otherwise
-        pairs are converted to dictionary entries, stripped of whitespace, and returned.
-        """
-        kv_dict = {}
-        for kv in self:
-            if not kv:
-                continue
-
-            if self._key_value_separator not in kv:
-                raise ValueError(
-                    f"Property {kv} does not contain the expected "
-                    f"separator character: '{self._key_value_separator}'."
-                )
-
-            key, value = kv.split(self._key_value_separator, 1)
-
-            key = key.strip()
-            if not key:
-                # Invalid entry; skip inclusion and continue
-                continue
-
-            if isinstance(value, str):
-                value = value.strip()
-            if not value:
-                # Invalid entry; skip inclusion and continue
-                continue
-
-            kv_dict[key] = value
-        return kv_dict
-
-    @classmethod
-    def to_str(cls, key: str, value: str) -> str:
-        return f"{key}{cls._key_value_separator}{value}"
-
-    @classmethod
-    def from_dict(cls, kv_dict: Dict) -> "KeyValueList":
-        """
-        Convert a set of key-value pairs stored in a dictionary to
-        a KeyValueList of strings with the defined separator.
-        """
-        str_list = [KeyValueList.to_str(key, value) for key, value in kv_dict.items()]
-        return KeyValueList(str_list)
-
-    @classmethod
-    def merge(cls, primary: "KeyValueList", secondary: "KeyValueList") -> "KeyValueList":
-        """
-        Merge two key-value pair lists, preferring the values given in the
-        primary parameter in the case of a matching key between the two lists.
-        """
-        primary_dict = primary.to_dict()
-        secondary_dict = secondary.to_dict()
-
-        return KeyValueList.from_dict({**secondary_dict, **primary_dict})
-
-    @classmethod
-    def difference(cls, minuend: "KeyValueList", subtrahend: "KeyValueList") -> "KeyValueList":
-        """
-        Given KeyValueLists, convert to dictionaries and remove any keys found in the
-        second (subtrahend) from the first (minuend), if present.
-
-        :param minuend: list to be subtracted from
-        :param subtrahend: list whose keys will be removed from the minuend
-
-        :returns: the difference of the two lists
-        """
-        subtract_dict = minuend.to_dict()
-        for key in subtrahend.to_dict().keys():
-            if key in subtract_dict:
-                subtract_dict.pop(key)
-
-        return KeyValueList.from_dict(subtract_dict)
-
-
-@dataclass
-class VolumeMount:
-    path: str
-    pvc_name: str
-
-
-@dataclass
-class KubernetesSecret:
-    env_var: str
-    name: str
-    key: str
-
-
-@dataclass
-class KubernetesToleration:
-    key: str
-    operator: str
-    value: str
-    effect: str
-
-
-@dataclass
-class KubernetesAnnotation:
-    key: str
-    value: str
-
-
-class DataClassJSONEncoder(json.JSONEncoder):
-    """
-    A JSON Encoder class to prevent errors during serialization of dataclasses.
-    """
-
-    def default(self, o):
-        """
-        Render dataclass content as dict
-        """
-        if is_dataclass(o):
-            return dataclass_asdict(o)
-        return super().default(o)
+        return False

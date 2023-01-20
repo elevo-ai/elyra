@@ -32,6 +32,7 @@ from elyra.pipeline.component import Component
 from elyra.pipeline.component_catalog import ComponentCache
 from elyra.pipeline.component_catalog import RefreshInProgressError
 from elyra.pipeline.parser import PipelineParser
+from elyra.pipeline.pipeline_constants import PIPELINE_PARAMETERS
 from elyra.pipeline.pipeline_definition import PipelineDefinition
 from elyra.pipeline.processor import PipelineProcessorManager
 from elyra.pipeline.processor import PipelineProcessorRegistry
@@ -126,6 +127,9 @@ class PipelineExportHandler(HttpErrorMixin, APIHandler):
         self.set_header("Content-Type", "application/json")
         await self.finish(json_msg)
 
+    def write_error(self, status_code, **kwargs):
+        HttpErrorMixin.write_error(self, status_code, **kwargs)
+
 
 class PipelineSchedulerHandler(HttpErrorMixin, APIHandler):
     """Handler to expose method calls to execute pipelines as batch jobs"""
@@ -170,6 +174,9 @@ class PipelineSchedulerHandler(HttpErrorMixin, APIHandler):
         self.set_header("Content-Type", "application/json")
         await self.finish(json_msg)
 
+    def write_error(self, status_code, **kwargs):
+        HttpErrorMixin.write_error(self, status_code, **kwargs)
+
 
 class PipelineComponentHandler(HttpErrorMixin, APIHandler):
     """Handler to expose method calls to retrieve pipelines editor component configuration"""
@@ -194,26 +201,59 @@ class PipelineComponentHandler(HttpErrorMixin, APIHandler):
         self.set_header("Content-Type", "application/json")
         await self.finish(palette_json)
 
+    def write_error(self, status_code, **kwargs):
+        HttpErrorMixin.write_error(self, status_code, **kwargs)
+
 
 class PipelinePropertiesHandler(HttpErrorMixin, APIHandler):
     """Handler to expose method calls to retrieve pipeline properties"""
 
     @web.authenticated
     async def get(self, runtime_type):
-        self.log.debug(f"Retrieving pipeline components for runtime type: {runtime_type}")
+        self.log.debug(f"Retrieving pipeline properties for runtime type: {runtime_type}")
 
         runtime_processor_type = get_runtime_processor_type(runtime_type, self.log, self.request.path)
         if not runtime_processor_type:
             raise web.HTTPError(400, f"Invalid runtime type '{runtime_type}'")
 
         # Get pipeline properties json
-        pipeline_properties_json = PipelineDefinition.get_canvas_properties_from_template(
-            package_name="templates/pipeline", template_name="pipeline_properties_template.jinja2"
-        )
+        pipeline_properties_json = PipelineDefinition.get_pipeline_properties(runtime_type=runtime_processor_type)
 
         self.set_status(200)
         self.set_header("Content-Type", "application/json")
         await self.finish(pipeline_properties_json)
+
+    def write_error(self, status_code, **kwargs):
+        HttpErrorMixin.write_error(self, status_code, **kwargs)
+
+
+class PipelineParametersHandler(HttpErrorMixin, APIHandler):
+    """Handler to expose method calls to retrieve pipeline parameters"""
+
+    @web.authenticated
+    async def get(self, runtime_type):
+        self.log.debug(f"Retrieving pipeline parameters for runtime type: {runtime_type}")
+
+        runtime_processor_type = get_runtime_processor_type(runtime_type, self.log, self.request.path)
+        if not runtime_processor_type:
+            raise web.HTTPError(400, f"Invalid runtime type '{runtime_type}'")
+
+        ppm = PipelineProcessorManager.instance()
+        pipeline_parameter_class = ppm.get_pipeline_parameter_class(runtime_type=runtime_processor_type)
+        if pipeline_parameter_class is not None:
+            # Get pipeline parameters json schema
+            pipeline_params_json = pipeline_parameter_class.get_schema()
+            self.set_status(200)
+        else:
+            # Pipeline parameters are not supported, return message indicating such
+            processor_name = runtime_processor_type.value
+            pipeline_params_json = json.dumps(
+                {"message": f"Runtime processor type '{processor_name}' does not support pipeline parameters."}
+            )
+            self.set_status(405)
+
+        self.set_header("Content-Type", "application/json")
+        await self.finish(pipeline_params_json)
 
 
 class PipelineComponentPropertiesHandler(HttpErrorMixin, APIHandler):
@@ -256,6 +296,9 @@ class PipelineComponentPropertiesHandler(HttpErrorMixin, APIHandler):
         if self.request.path.endswith("/properties"):
             # Return complete set of component properties
             json_response = ComponentCache.to_canvas_properties(component)
+            if not PipelineProcessorManager.instance().supports_pipeline_params(runtime_type=runtime_processor_type):
+                # Pipeline parameters are not supported and the property can be removed from the set
+                json_response["properties"]["component_parameters"]["properties"].pop(PIPELINE_PARAMETERS, None)
         else:
             # Return component definition content
             json_response = json.dumps(
@@ -265,6 +308,9 @@ class PipelineComponentPropertiesHandler(HttpErrorMixin, APIHandler):
         self.set_status(200)
         self.set_header("Content-Type", "application/json")
         await self.finish(json_response)
+
+    def write_error(self, status_code, **kwargs):
+        HttpErrorMixin.write_error(self, status_code, **kwargs)
 
 
 class PipelineValidationHandler(HttpErrorMixin, APIHandler):
@@ -290,6 +336,9 @@ class PipelineValidationHandler(HttpErrorMixin, APIHandler):
         self.set_header("Content-Type", "application/json")
         await self.finish(json_msg)
 
+    def write_error(self, status_code, **kwargs):
+        HttpErrorMixin.write_error(self, status_code, **kwargs)
+
 
 class PipelineRuntimeTypesHandler(HttpErrorMixin, APIHandler):
     """Handler to get static information relative to the set of configured runtime types"""
@@ -306,6 +355,9 @@ class PipelineRuntimeTypesHandler(HttpErrorMixin, APIHandler):
         self.set_status(200)
         self.set_header("Content-Type", "application/json")
         await self.finish({"runtime_types": runtime_types})
+
+    def write_error(self, status_code, **kwargs):
+        HttpErrorMixin.write_error(self, status_code, **kwargs)
 
 
 class ComponentCacheHandler(HttpErrorMixin, APIHandler):
@@ -327,6 +379,9 @@ class ComponentCacheHandler(HttpErrorMixin, APIHandler):
             self.set_status(409, str(ripe))
 
         await self.finish()
+
+    def write_error(self, status_code, **kwargs):
+        HttpErrorMixin.write_error(self, status_code, **kwargs)
 
 
 class ComponentCacheCatalogHandler(HttpErrorMixin, APIHandler):
@@ -353,3 +408,6 @@ class ComponentCacheCatalogHandler(HttpErrorMixin, APIHandler):
         self.set_status(204)
 
         await self.finish()
+
+    def write_error(self, status_code, **kwargs):
+        HttpErrorMixin.write_error(self, status_code, **kwargs)

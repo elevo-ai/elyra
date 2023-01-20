@@ -45,7 +45,7 @@ For more details on the **pipeline json definition** see it's [json schema](http
 				"label": "generate-contributions",
 				"component_parameters": {
 					"filename": "demo-pipelines/generate-contributions.ipynb",
-					"runtime_image": "tensorflow/tensorflow:2.0.0-py3",
+					"runtime_image": "tensorflow/tensorflow@sha256:7c01f75d58fadc2cd1109d5baac1925ed131e05925d840b1b49363c794d1c4db",
 					"outputs": ["community_contributions.csv"],
 					"env_vars": ["GITHUB_TOKEN=xxxx"],
 					"dependencies": ["contributors.csv"],
@@ -89,7 +89,7 @@ For more details on the **pipeline json definition** see it's [json schema](http
 				"label": "generate-stats",
 				"component_parameters": {
 					"filename": "demo-pipelines/generate-stats.ipynb",
-					"runtime_image": "tensorflow/tensorflow:2.0.0-py3",
+					"runtime_image": "tensorflow/tensorflow@sha256:7c01f75d58fadc2cd1109d5baac1925ed131e05925d840b1b49363c794d1c4db",
 					"outputs": ["community_stats.csv"],
 					"env_vars": ["GITHUB_TOKEN=xxxx"],
 					"dependencies": ["contributors.csv"],
@@ -125,7 +125,7 @@ For more details on the **pipeline json definition** see it's [json schema](http
 				"label": "overview",
 				"component_parameters": {
 					"filename": "demo-pipelines/overview.ipynb",
-					"runtime_image": "elyra/tensorflow:1.15.2-py3",
+					"runtime_image": "tensorflow/tensorflow@sha256:7c01f75d58fadc2cd1109d5baac1925ed131e05925d840b1b49363c794d1c4db",
 					"include_subdirectories": false
 				},
 				"ui_data": {
@@ -178,7 +178,7 @@ For more details on the **pipeline json definition** see it's [json schema](http
 ## Pipeline Processor Customization
 Elyra implements an extensible **pipeline processor engine**, which enables the addition of new pipeline processors utilizing
 a service discovery mechanism.  The pipeline processor class hierarchy is depicted here:
-![Pipeline Processor Class Hierachy](../images/pipeline-processor-class-hierarchy.png)
+![Pipeline Processor Class Hierachy](../images/developer_guide/pipelines/pipeline-processor-class-hierarchy.png)
 This section outlines what is needed to introduce your own runtime for integration with Elyra.  In essence, two criteria must be fulfilled to introduce a new runtime: 
 1. A schema describing the necessary runtime metadata
 1. A pipeline processor implementation appropriately associated to the runtime
