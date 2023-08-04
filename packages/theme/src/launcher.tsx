@@ -46,7 +46,7 @@ import * as React from 'react';
 /**
  * The known categories of launcher items and their default ordering.
  */
-const ELYRA_CATEGORY = 'Foresight';
+const ELYRA_CATEGORY = 'Aizen Foresight';
 
 const CommandIDs = {
   newFile: 'fileeditor:create-new',
