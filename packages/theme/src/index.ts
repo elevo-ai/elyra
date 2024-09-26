@@ -227,19 +227,19 @@ const extension: JupyterFrontEndPlugin<ILauncher> = {
 
     model.add({
       command: CommandIDs.openHelp,
-      category: 'Aizen Foresight',
+      category: 'Aizen',
       rank: 10
     });
 
     model.add({
       command: CommandIDs.explorer,
-      category: 'Aizen Foresight',
+      category: 'Aizen',
       rank: 11
     });
 
     model.add({
       command: CommandIDs.mlflow,
-      category: 'Aizen Foresight',
+      category: 'Aizen',
       rank: 12
     });
 
