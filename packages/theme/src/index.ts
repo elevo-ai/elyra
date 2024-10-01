@@ -42,7 +42,8 @@ const CommandIDs = {
   openHelp: 'elyra:open-help',
   mlflow: 'elyra:mlflow',
   explorer: 'elyra:explorer',
-  grafana: 'elyra:grafana'
+  grafana: 'elyra:grafana',
+  kibana: 'elyra:kibana'
 };
 
 /**
@@ -231,6 +232,23 @@ const extension: JupyterFrontEndPlugin<ILauncher> = {
       }
     });
 
+    commands.addCommand(CommandIDs.kibana, {
+      label: 'Kibana',
+      icon: explorerIcon,
+      execute: (args: any) => {
+        const hubPrefix = paths.urls.hubPrefix;
+        if (hubPrefix !== null && hubPrefix !== undefined) {
+          window.open(window.location.origin + '/kibana/');
+        } else {
+          window.open(
+            window.location.origin +
+              paths.urls.base +
+              'user-redirect/proxy/foresight-kibana-service:5601/'
+          );
+        }
+      }
+    });
+
     /*    commands.addCommand(CommandIDs.releases, {
       label: "What's new in latest ",
       caption: "What's new in this release",
@@ -265,6 +283,12 @@ const extension: JupyterFrontEndPlugin<ILauncher> = {
       command: CommandIDs.grafana,
       category: 'Aizen',
       rank: 13
+    });
+
+    model.add({
+      command: CommandIDs.kibana,
+      category: 'Aizen',
+      rank: 14
     });
 
     /*
