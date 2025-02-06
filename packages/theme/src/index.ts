@@ -165,13 +165,13 @@ const extension: JupyterFrontEndPlugin<ILauncher> = {
           window.open(
             window.location.origin +
               hubPrefix.replace('/hub/', '/') +
-              'user-redirect/proxy/foresight-docs-service:80/'
+              'user-redirect/proxy/aizen-docs-service:80/'
           );
         } else {
           window.open(
             window.location.origin +
               paths.urls.base +
-              'user-redirect/proxy/foresight-docs-service:80/'
+              'user-redirect/proxy/aizen-docs-service:80/'
           );
         }
       }
@@ -186,13 +186,13 @@ const extension: JupyterFrontEndPlugin<ILauncher> = {
           window.open(
             window.location.origin +
               hubPrefix.replace('/hub/', '/') +
-              'user-redirect/proxy/foresight-explorer-service:8900/'
+              'user-redirect/proxy/aizen-explorer-service:8900/'
           );
         } else {
           window.open(
             window.location.origin +
               paths.urls.base +
-              'user-redirect/proxy/foresight-explorer-service:8900/'
+              'user-redirect/proxy/aizen-explorer-service:8900/'
           );
         }
       }
@@ -209,7 +209,7 @@ const extension: JupyterFrontEndPlugin<ILauncher> = {
           window.open(
             window.location.origin +
               paths.urls.base +
-              'user-redirect/proxy/foresight-mlflow-service:5000/'
+              'user-redirect/proxy/aizen-mlflow-service:5000/'
           );
         }
       }
@@ -226,7 +226,7 @@ const extension: JupyterFrontEndPlugin<ILauncher> = {
           window.open(
             window.location.origin +
               paths.urls.base +
-              'user-redirect/proxy/foresight-prometheus-operator-grafana:80/'
+              'user-redirect/proxy/aizen-prometheus-operator-grafana:80/'
           );
         }
       }
@@ -243,7 +243,7 @@ const extension: JupyterFrontEndPlugin<ILauncher> = {
           window.open(
             window.location.origin +
               paths.urls.base +
-              'user-redirect/proxy/foresight-kibana-service:5601/'
+              'user-redirect/proxy/aizen-kibana-service:5601/'
           );
         }
       }
@@ -294,7 +294,7 @@ const extension: JupyterFrontEndPlugin<ILauncher> = {
     /*
     model.add({
       command: CommandIDs.releases,
-      category: 'Aizen Foresight',
+      category: 'Aizen',
       rank: 13
     });
     */
